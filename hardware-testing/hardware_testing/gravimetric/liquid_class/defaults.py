@@ -127,7 +127,7 @@ _aspirate_defaults = {
         50: {  # P50
             50: {  # T50
                 1: AspirateSettings(  # 1uL
-                    flow_rate=57,
+                    flow_rate=3.93,
                     delay=1.0,
                     submerge=_default_submerge_mm_t50,
                     retract=_default_retract_mm,
@@ -137,7 +137,7 @@ _aspirate_defaults = {
                     ),
                 ),
                 10: AspirateSettings(  # 10uL
-                    flow_rate=7.85,
+                    flow_rate=3.93,
                     delay=1.0,
                     submerge=_default_submerge_mm_t50,
                     retract=_default_retract_mm,
@@ -147,7 +147,7 @@ _aspirate_defaults = {
                     ),
                 ),
                 50: AspirateSettings(  # 50uL
-                    flow_rate=7.85,
+                    flow_rate=3.93,
                     delay=1.0,
                     submerge=_default_submerge_mm_t50,
                     retract=_default_retract_mm,
@@ -161,7 +161,7 @@ _aspirate_defaults = {
         1000: {  # P1000
             50: {  # T50
                 5: AspirateSettings(  # 5uL
-                    flow_rate=6.5,
+                    flow_rate=15.9,
                     delay=1.0,
                     submerge=_default_submerge_mm_t50,
                     retract=_default_retract_mm,
@@ -171,7 +171,7 @@ _aspirate_defaults = {
                     ),
                 ),
                 10: AspirateSettings(  # 10uL
-                    flow_rate=6.5,
+                    flow_rate=15.9,
                     delay=1.0,
                     submerge=_default_submerge_mm_t50,
                     retract=_default_retract_mm,
@@ -181,7 +181,7 @@ _aspirate_defaults = {
                     ),
                 ),
                 50: AspirateSettings(  # 50uL
-                    flow_rate=6.5,
+                    flow_rate=15.9,
                     delay=1.0,
                     submerge=_default_submerge_mm_t50,
                     retract=_default_retract_mm,
@@ -193,7 +193,7 @@ _aspirate_defaults = {
             },
             200: {  # T200
                 5: AspirateSettings(  # 5uL
-                    flow_rate=80,
+                    flow_rate=159.04,
                     delay=1.0,
                     submerge=_default_submerge_mm,
                     retract=_default_retract_mm,
@@ -203,7 +203,7 @@ _aspirate_defaults = {
                     ),
                 ),
                 50: AspirateSettings(  # 50uL
-                    flow_rate=80,
+                    flow_rate=159.04,
                     delay=1.0,
                     submerge=_default_submerge_mm,
                     retract=_default_retract_mm,
@@ -213,7 +213,7 @@ _aspirate_defaults = {
                     ),
                 ),
                 200: AspirateSettings(  # 200uL
-                    flow_rate=80,
+                    flow_rate=159.04,
                     delay=1.0,
                     submerge=_default_submerge_mm,
                     retract=_default_retract_mm,
@@ -225,7 +225,7 @@ _aspirate_defaults = {
             },
             1000: {  # T1000
                 10: AspirateSettings(  # 10uL
-                    flow_rate=160,
+                    flow_rate=159.04,
                     delay=1.0,
                     submerge=_default_submerge_mm,
                     retract=_default_retract_mm,
@@ -235,7 +235,7 @@ _aspirate_defaults = {
                     ),
                 ),
                 100: AspirateSettings(  # 100uL
-                    flow_rate=160,
+                    flow_rate=159.04,
                     delay=1.0,
                     submerge=_default_submerge_mm,
                     retract=_default_retract_mm,
@@ -245,7 +245,7 @@ _aspirate_defaults = {
                     ),
                 ),
                 1000: AspirateSettings(  # 1000uL
-                    flow_rate=160,
+                    flow_rate=159.04,
                     delay=1.0,
                     submerge=_default_submerge_mm,
                     retract=_default_retract_mm,
