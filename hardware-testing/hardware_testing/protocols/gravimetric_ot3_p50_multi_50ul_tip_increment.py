@@ -1,7 +1,7 @@
 """Gravimetric OT3."""
 from opentrons.protocol_api import ProtocolContext
 
-metadata = {"protocolName": "gravimetric-ot3-p50-multi"}
+metadata = {"protocolName": "gravimetric-ot3-p50-multi-increment"}
 # FIXME: bump to v2.14 to utilize protocol engine
 requirements = {"robotType": "OT-3", "apiLevel": "2.13"}
 
