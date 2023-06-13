@@ -137,7 +137,7 @@ _aspirate_defaults = {
                     ),
                 ),
                 10: AspirateSettings(  # 10uL
-                    flow_rate=54.98,
+                    flow_rate=15.71,
                     delay=1.0,
                     submerge=_default_submerge_mm_t50,
                     retract=_default_retract_mm,
@@ -147,7 +147,7 @@ _aspirate_defaults = {
                     ),
                 ),
                 50: AspirateSettings(  # 50uL
-                    flow_rate=54.98,
+                    flow_rate=15.71,
                     delay=1.0,
                     submerge=_default_submerge_mm_t50,
                     retract=_default_retract_mm,
