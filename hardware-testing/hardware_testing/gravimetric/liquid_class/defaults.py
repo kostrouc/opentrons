@@ -161,7 +161,7 @@ _aspirate_defaults = {
         1000: {  # P1000
             50: {  # T50
                 5: AspirateSettings(  # 5uL
-                    flow_rate=159.04,
+                    flow_rate=318.09,
                     delay=1.0,
                     submerge=_default_submerge_mm_t50,
                     retract=_default_retract_mm,
@@ -171,7 +171,7 @@ _aspirate_defaults = {
                     ),
                 ),
                 10: AspirateSettings(  # 10uL
-                    flow_rate=159.04,
+                    flow_rate=318.09,
                     delay=1.0,
                     submerge=_default_submerge_mm_t50,
                     retract=_default_retract_mm,
@@ -181,7 +181,7 @@ _aspirate_defaults = {
                     ),
                 ),
                 50: AspirateSettings(  # 50uL
-                    flow_rate=159.04,
+                    flow_rate=318.09,
                     delay=1.0,
                     submerge=_default_submerge_mm_t50,
                     retract=_default_retract_mm,
@@ -193,7 +193,7 @@ _aspirate_defaults = {
             },
             200: {  # T200
                 5: AspirateSettings(  # 5uL
-                    flow_rate=477.13,
+                    flow_rate=636.17,
                     delay=1.0,
                     submerge=_default_submerge_mm,
                     retract=_default_retract_mm,
@@ -203,7 +203,7 @@ _aspirate_defaults = {
                     ),
                 ),
                 50: AspirateSettings(  # 50uL
-                    flow_rate=477.13,
+                    flow_rate=636.17,
                     delay=1.0,
                     submerge=_default_submerge_mm,
                     retract=_default_retract_mm,
@@ -213,7 +213,7 @@ _aspirate_defaults = {
                     ),
                 ),
                 200: AspirateSettings(  # 200uL
-                    flow_rate=477.13,
+                    flow_rate=636.17,
                     delay=1.0,
                     submerge=_default_submerge_mm,
                     retract=_default_retract_mm,
@@ -225,7 +225,7 @@ _aspirate_defaults = {
             },
             1000: {  # T1000
                 10: AspirateSettings(  # 10uL
-                    flow_rate=636.17,
+                    flow_rate=954.26,
                     delay=1.0,
                     submerge=_default_submerge_mm,
                     retract=_default_retract_mm,
@@ -235,7 +235,7 @@ _aspirate_defaults = {
                     ),
                 ),
                 100: AspirateSettings(  # 100uL
-                    flow_rate=636.17,
+                    flow_rate=954.26,
                     delay=1.0,
                     submerge=_default_submerge_mm,
                     retract=_default_retract_mm,
@@ -245,7 +245,7 @@ _aspirate_defaults = {
                     ),
                 ),
                 1000: AspirateSettings(  # 1000uL
-                    flow_rate=636.17,
+                    flow_rate=954.26,
                     delay=1.0,
                     submerge=_default_submerge_mm,
                     retract=_default_retract_mm,
