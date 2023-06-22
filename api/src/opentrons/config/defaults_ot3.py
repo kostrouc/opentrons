@@ -91,7 +91,7 @@ DEFAULT_MAX_SPEEDS: Final[ByGantryLoad[Dict[OT3AxisKind, float]]] = ByGantryLoad
         OT3AxisKind.X: 375,
         OT3AxisKind.Y: 375,
         OT3AxisKind.Z: 100,
-        OT3AxisKind.P: 45,
+        OT3AxisKind.P: 70,
         OT3AxisKind.Z_G: 50,
     },
 )
