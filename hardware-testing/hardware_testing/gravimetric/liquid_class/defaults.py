@@ -20,7 +20,7 @@ _dispense_defaults = {
         50: {  # P50
             50: {  # T50
                 1: DispenseSettings(  # 1uL
-                    flow_rate=23.56,
+                    flow_rate=54.98,
                     delay=0.5,
                     submerge=_default_submerge_mm_t50,
                     retract=_default_retract_mm,
@@ -28,7 +28,7 @@ _dispense_defaults = {
                     deceleration=40000,  # this is a fake number
                 ),
                 10: DispenseSettings(  # 10uL
-                    flow_rate=23.56,
+                    flow_rate=54.98,
                     delay=0.5,
                     submerge=_default_submerge_mm_t50,
                     retract=_default_retract_mm,
@@ -36,7 +36,7 @@ _dispense_defaults = {
                     deceleration=40000,  # this is a fake number
                 ),
                 50: DispenseSettings(  # 50uL
-                    flow_rate=23.56,
+                    flow_rate=54.98,
                     delay=0.5,
                     submerge=_default_submerge_mm_t50,
                     retract=_default_retract_mm,
