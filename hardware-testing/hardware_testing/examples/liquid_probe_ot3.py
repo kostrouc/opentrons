@@ -54,27 +54,34 @@ async def _main(
     )
 
     # PICK-UP-TIP
-    print(f"about to pick-up-tip")
-    if not api.is_simulator:
-        input("press ENTER to continue: ")
-    await helpers_ot3.move_to_arched_ot3(api, mount, tip_pos + Point(z=20))
-    print("jog to PICK-UP-TIP location:")
-    await helpers_ot3.jog_mount_ot3(api, mount)
-    await api.pick_up_tip(mount, tip_length=tip_length)
-    await api.retract(mount)
+    if api.is_simulator or "y" in input("pick up tips? (y/n): "):
+        print(f"about to pick-up-tip")
+        if not api.is_simulator:
+            input("press ENTER to continue: ")
+        await helpers_ot3.move_to_arched_ot3(api, mount, tip_pos + Point(z=20))
+        print("jog to PICK-UP-TIP location:")
+        await helpers_ot3.jog_mount_ot3(api, mount)
+        await api.pick_up_tip(mount, tip_length=tip_length)
+        await api.retract(mount)
+    else:
+        await api.add_tip(mount, tip_length=tip_length)
+        await api.prepare_for_aspirate(mount)
 
     # LIQUID-PROBE
     print(f"about to move to well A1 of labware {labware}")
     if not api.is_simulator:
         input("press ENTER to continue: ")
     await helpers_ot3.move_to_arched_ot3(api, mount, labware_well_top)
-    print(f"about to liquid probe {probe_settings.max_z_distance}mm down")
-    if not api.is_simulator:
-        input("press ENTER to continue: ")
-    found_z = await api.liquid_probe(mount, probe_settings, probe)
-    liquid_height = found_z - (labware_well_top.z - labware_well_depth)
-    print(f"found height in well: {round(liquid_height, 1)} mm")
-    await api.retract()
+    while True:
+        print(f"about to liquid probe {probe_settings.max_z_distance}mm down")
+        if not api.is_simulator:
+            input("press ENTER to continue: ")
+        found_z = await api.liquid_probe(mount, probe_settings, probe)
+        liquid_height = found_z - (labware_well_top.z - labware_well_depth)
+        print(f"found height in well: {round(liquid_height, 1)} mm")
+        if api.is_simulator or "y" not in input("probe again? (y/n): "):
+            break
+    await api.retract(mount)
 
     # RETURN-TIP
     await helpers_ot3.move_to_arched_ot3(api, mount, tip_pos - Point(z=-10))
