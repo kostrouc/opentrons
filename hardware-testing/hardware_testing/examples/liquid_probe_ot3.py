@@ -39,7 +39,7 @@ async def _main(
     api = await helpers_ot3.build_async_ot3_hardware_api(
         is_simulating=is_simulating, pipette_left="p1000_single_v3.5"
     )
-    await api.retract(mount)
+    await api.home()
 
     # GATHER VARIABLES
     pip = api.hardware_pipettes[mount.to_mount()]
@@ -60,7 +60,12 @@ async def _main(
     )
 
     # PICK-UP-TIP
-    await helpers_ot3.move_to_arched_ot3(api, mount, tip_pos)
+    print(f"about to pick-up-tip")
+    if not api.is_simulator:
+        input("press ENTER to continue: ")
+    await helpers_ot3.move_to_arched_ot3(api, mount, tip_pos + Point(z=20))
+    print("jog to PICK-UP-TIP location:")
+    await helpers_ot3.jog_mount_ot3(api, mount)
     await api.pick_up_tip(mount, tip_length=tip_length)
     await api.retract(mount)
 
