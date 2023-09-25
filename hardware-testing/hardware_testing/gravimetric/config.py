@@ -181,14 +181,12 @@ LIQUID_PROBE_SETTINGS: Dict[int, Dict[int, Dict[int, Dict[str, int]]]] = {
 
 
 def _get_liquid_probe_settings(
-    cfg: VolumetricConfig, well: Well
+    channels: int, volume: int, tip: int, z_start: float, z_max_travel: float
 ) -> LiquidProbeSettings:
-    lqid_cfg: Dict[str, int] = LIQUID_PROBE_SETTINGS[cfg.pipette_volume][
-        cfg.pipette_channels
-    ][cfg.tip_volume]
+    lqid_cfg: Dict[str, int] = LIQUID_PROBE_SETTINGS[volume][channels][tip]
     return LiquidProbeSettings(
-        starting_mount_height=well.top().point.z,
-        max_z_distance=min(well.depth, lqid_cfg["max_z_distance"]),
+        starting_mount_height=z_start,
+        max_z_distance=min(z_max_travel, lqid_cfg["max_z_distance"]),
         min_z_distance=lqid_cfg["min_z_distance"],
         mount_speed=lqid_cfg["mount_speed"],
         plunger_speed=lqid_cfg["plunger_speed"],

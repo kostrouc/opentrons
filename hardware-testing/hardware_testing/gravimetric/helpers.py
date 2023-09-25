@@ -151,7 +151,13 @@ def _sense_liquid_height(
         return well.depth - 1
     hwapi = get_sync_hw_api(ctx)
     pipette.move_to(well.top())
-    lps = config._get_liquid_probe_settings(cfg, well)
+    lps = config._get_liquid_probe_settings(
+        cfg.pipette_channels,
+        cfg.pipette_volume,
+        cfg.tip_volume,
+        well.top().point.z,
+        well.depth,
+    )
     well_bottom_z = well.bottom().point.z
     # NOTE: very important that probing is done only 1x time,
     #       with a DRY tip, for reliability

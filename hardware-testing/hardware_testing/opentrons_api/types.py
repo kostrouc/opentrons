@@ -6,6 +6,7 @@ from opentrons.hardware_control.types import (
     CriticalPoint,
     OT3AxisKind,
     GripperProbe,
+    InstrumentProbeType,
 )
 from opentrons.types import Point, Mount
 
