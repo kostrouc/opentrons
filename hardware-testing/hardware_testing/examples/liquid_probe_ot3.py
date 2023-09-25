@@ -9,21 +9,15 @@ from hardware_testing.opentrons_api import helpers_ot3
 
 from hardware_testing.gravimetric.config import _get_liquid_probe_settings
 
+DEFAULT_LABWARE = "nest_1_reservoir_195ml"
+
 TIP_RACK_SLOT = 3
 LABWARE_SLOT = 2
 
-PROBE_OFFSET = {
-    1: {
-        InstrumentProbeType.PRIMARY: Point(x=0, y=0, z=0),
-    },
-    8: {
-        InstrumentProbeType.PRIMARY: Point(x=0, y=0, z=0),
-        InstrumentProbeType.SECONDARY: Point(x=0, y=9 * 7, z=0),
-    },
-    96: {
-        InstrumentProbeType.PRIMARY: Point(x=0, y=0, z=0),
-        InstrumentProbeType.SECONDARY: Point(x=9 * -11, y=9 * 7, z=0),
-    },
+CHANNEL_OFFSET = {
+    1: Point(),
+    8: Point(y=9 * 7 * 0.5),
+    96: Point(x=9 * -11 * 0.5, y=9 * 7 * 0.5)
 }
 
 
@@ -50,7 +44,7 @@ async def _main(
     labware_def = load_definition(loadname=labware, version=1)
     labware_well_depth = labware_def["wells"]["A1"]["depth"]
     labware_well_top = helpers_ot3.get_theoretical_a1_position(LABWARE_SLOT, labware)
-    labware_well_top += PROBE_OFFSET[int(pip.channels)][probe]
+    labware_well_top += CHANNEL_OFFSET[int(pip.channels)]
     probe_settings = _get_liquid_probe_settings(
         pip.channels,
         int(pip.working_volume),
@@ -70,10 +64,13 @@ async def _main(
     await api.retract(mount)
 
     # LIQUID-PROBE
-    print(f"about to probe liquid in well A1 of labware {labware}")
+    print(f"about to move to well A1 of labware {labware}")
     if not api.is_simulator:
         input("press ENTER to continue: ")
     await helpers_ot3.move_to_arched_ot3(api, mount, labware_well_top)
+    print(f"about to liquid probe {probe_settings.max_z_distance}mm down")
+    if not api.is_simulator:
+        input("press ENTER to continue: ")
     found_z = await api.liquid_probe(mount, probe_settings, probe)
     liquid_height = found_z - (labware_well_top.z - labware_well_depth)
     print(f"found height in well: {round(liquid_height, 1)} mm")
@@ -103,6 +100,6 @@ if __name__ == "__main__":
                 "primary": InstrumentProbeType.PRIMARY,
                 "secondary": InstrumentProbeType.SECONDARY,
             }[args.probe],
-            labware="nest_12_reservoir_15ml",
+            labware=DEFAULT_LABWARE,
         )
     )

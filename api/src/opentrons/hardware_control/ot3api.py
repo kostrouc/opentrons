@@ -2316,7 +2316,7 @@ class OT3API(
         p_speed = probe_settings.plunger_speed
         z_speed = probe_settings.mount_speed
         actual_max_z_dist = (p_dist / p_speed) * z_speed
-        if actual_max_z_dist > probe_settings.max_z_distance:
+        if probe_settings.max_z_distance > actual_max_z_dist:
             raise RuntimeError(f"liquid probe Z cannot travel "
                                f"{probe_settings.max_z_distance}mm "
                                f"(max={round(actual_max_z_dist, 2)}mm)")
