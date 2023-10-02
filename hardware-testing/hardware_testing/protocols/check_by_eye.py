@@ -14,18 +14,21 @@ TIP_VOLUME = 50
 # NOTE: pipette will loop through volumes
 #       circling back to the first, regardless of which well it is at
 #       so number of volumes can be any length you like (example: [1])
-TEST_VOLUMES = [1, 2, 3, 4]
+TEST_VOLUMES = [0.5]
+
+PRE_WET_COUNT = 1
 
 # FIXME: operator must LPC to liquid-surface in reservoir in order for this to work
 #        need to get liquid-probing working ASAP to fix this hack
-ASPIRATE_DEPTH = -3.0
+ASPIRATE_DEPTH = -2.0
 DISPENSE_DEPTH = -1.5
+BLOW_OUT_HEIGHT = 5.0
 
-ASPIRATE_FLOW_RATE = 35  # default for P50S and P50M is 35ul/sec
+ASPIRATE_FLOW_RATE = 2  # default for P50S and P50M is 35ul/sec
 DISPENSE_FLOW_RATE = 57  # default for P50S and P50M is 57ul/sec
 
 ASPIRATE_PRE_DELAY = 1.0
-ASPIRATE_POST_DELAY = 1.0
+ASPIRATE_POST_DELAY = 2.0
 DISPENSE_PRE_DELAY = 0.0
 DISPENSE_POST_DELAY = 0.5
 
@@ -37,10 +40,10 @@ PLATE_NAME = "corning_96_wellplate_360ul_flat"
 
 RACK_AND_PLATE_SLOTS = [  # [rack, plate]
     ["B1", "C1"],
-    # ["B2", "C2"],
-    # ["B3", "C3"],
-    # ["A1", "D2"],
-    # ["A2", "D3"]
+    ["B2", "C2"],
+    ["B3", "C3"],
+    ["A1", "D2"],
+    ["A2", "D3"]
 ]
 
 HEIGHT_OF_200UL_IN_PLATE_MM = 6.04  # height of 200ul in a Corning 96-well flat-bottom
@@ -85,7 +88,15 @@ def run(ctx: ProtocolContext) -> None:
             # ASPIRATE
             aspirate_pos = reservoir[RESERVOIR_WELL].top(ASPIRATE_DEPTH)
             pipette.move_to(aspirate_pos)
-            ctx.delay(seconds=ASPIRATE_PRE_DELAY)
+            for i in range(PRE_WET_COUNT):
+                ctx.delay(seconds=ASPIRATE_PRE_DELAY)
+                pipette.aspirate(volume, aspirate_pos)
+                ctx.delay(seconds=ASPIRATE_POST_DELAY)
+                push_out_vol = 0 if i < PRE_WET_COUNT - 1 else PIP_PUSH_OUT
+                ctx.delay(seconds=DISPENSE_PRE_DELAY)
+                pipette.dispense(volume, aspirate_pos, push_out=push_out_vol)
+                ctx.delay(seconds=DISPENSE_POST_DELAY)
+            pipette.blow_out(reservoir[RESERVOIR_WELL].top(BLOW_OUT_HEIGHT))
             pipette.aspirate(volume, aspirate_pos)
             ctx.delay(seconds=ASPIRATE_POST_DELAY)
             pipette.move_to(plate[well_name].top(5))
