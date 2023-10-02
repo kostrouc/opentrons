@@ -1,6 +1,8 @@
 """Check by Eye dot Py."""
 from opentrons.protocol_api import ProtocolContext
 
+from opentrons.hardware_control.types import OT3Mount
+
 metadata = {"protocolName": "check-by-eye-dot-py"}
 requirements = {"robotType": "Flex", "apiLevel": "2.15"}
 
@@ -15,8 +17,8 @@ TIP_VOLUME = 50
 #       circling back to the first, regardless of which well it is at
 #       so number of volumes can be any length you like (example: [1])
 TEST_VOLUMES = [0.5]
-
-PRE_WET_COUNT = 1
+PRE_WET_VOLUMES = [0.3]
+PRE_WET_COUNT = 5
 
 # FIXME: operator must LPC to liquid-surface in reservoir in order for this to work
 #        need to get liquid-probing working ASAP to fix this hack
@@ -47,6 +49,9 @@ RACK_AND_PLATE_SLOTS = [  # [rack, plate]
 ]
 
 HEIGHT_OF_200UL_IN_PLATE_MM = 6.04  # height of 200ul in a Corning 96-well flat-bottom
+
+# FIXME: get liquid-probe woring in API, then delete this
+RESERVOIR_LPC_OFFSET = -10
 
 
 def run(ctx: ProtocolContext) -> None:
@@ -81,37 +86,45 @@ def run(ctx: ProtocolContext) -> None:
             row = "ABCDEFGH"[int(trial / 12)]
             well_name = f"{row}{column}"
 
+            # CRITICAL POSITIONS
+            aspirate_pos = reservoir[RESERVOIR_WELL].top(ASPIRATE_DEPTH + RESERVOIR_LPC_OFFSET)
+            blow_out_pos_pre_wet = reservoir[RESERVOIR_WELL].top(BLOW_OUT_HEIGHT + RESERVOIR_LPC_OFFSET)
+            dispense_pos = plate[well_name].bottom(
+                HEIGHT_OF_200UL_IN_PLATE_MM + DISPENSE_DEPTH
+            )
+            blow_out_pos_dispense = plate[well_name].top()
+
             # PICK-UP TIP
             pipette.configure_for_volume(volume)
             pipette.pick_up_tip(rack[well_name])
 
-            # ASPIRATE
-            aspirate_pos = reservoir[RESERVOIR_WELL].top(ASPIRATE_DEPTH)
+            # PRE-WET
             pipette.move_to(aspirate_pos)
+            ctx.delay(seconds=ASPIRATE_PRE_DELAY)
             for i in range(PRE_WET_COUNT):
-                ctx.delay(seconds=ASPIRATE_PRE_DELAY)
                 pipette.aspirate(volume, aspirate_pos)
-                ctx.delay(seconds=ASPIRATE_POST_DELAY)
-                push_out_vol = 0 if i < PRE_WET_COUNT - 1 else PIP_PUSH_OUT
-                ctx.delay(seconds=DISPENSE_PRE_DELAY)
-                pipette.dispense(volume, aspirate_pos, push_out=push_out_vol)
-                ctx.delay(seconds=DISPENSE_POST_DELAY)
-            pipette.blow_out(reservoir[RESERVOIR_WELL].top(BLOW_OUT_HEIGHT))
+                push_out = 0 if i < PRE_WET_COUNT - 1 else PIP_PUSH_OUT
+                pipette.dispense(volume, aspirate_pos, push_out=push_out)
+            ctx.delay(seconds=DISPENSE_POST_DELAY)
+            pipette.blow_out(blow_out_pos_pre_wet)
+            # FIXME: need to be able to do this in Protocol API
+            if not ctx.is_simulating():
+                hw_mount = OT3Mount.LEFT if pipette.mount == "left" else OT3Mount.RIGHT
+                ctx._core.get_hardware().prepare_for_aspirate(hw_mount)
+
+            # ASPIRATE
+            pipette.move_to(aspirate_pos)
+            ctx.delay(seconds=ASPIRATE_PRE_DELAY)
             pipette.aspirate(volume, aspirate_pos)
             ctx.delay(seconds=ASPIRATE_POST_DELAY)
-            pipette.move_to(plate[well_name].top(5))
-            ctx.pause()  # visual check
+            pipette.move_to(blow_out_pos_dispense)
 
             # DISPENSE
-            dispense_pos = plate[well_name].bottom(
-                HEIGHT_OF_200UL_IN_PLATE_MM + DISPENSE_DEPTH
-            )
             pipette.move_to(dispense_pos)
             ctx.delay(seconds=DISPENSE_PRE_DELAY)
             pipette.dispense(volume, dispense_pos, push_out=PIP_PUSH_OUT)
             ctx.delay(seconds=DISPENSE_POST_DELAY)
-            pipette.move_to(plate[well_name].top(5))
-            ctx.pause()  # visual check
+            pipette.blow_out(blow_out_pos_dispense)
 
             # DROP TIP
-            pipette.drop_tip(home_after=False)
+            pipette.drop_tip(rack[well_name], home_after=False)
