@@ -3,7 +3,7 @@ from opentrons.protocol_api import ProtocolContext
 from datetime import datetime
 from opentrons.hardware_control.types import OT3Mount
 
-metadata = {"protocolName": "SLOW-MIX-NO-PRE-DELAY-V3"}
+metadata = {"protocolName": "SLOW-MIX-NO-PRE-DELAY-V4"}
 requirements = {"robotType": "Flex", "apiLevel": "2.15"}
 
 PIP_CHANNELS = 8
@@ -62,7 +62,7 @@ def run(ctx: ProtocolContext) -> None:
     hw.open_pressure_csv(
         f"{metadata['protocolName']}-{datetime.now().strftime('%H:%M:%S')}"
     )
-    hw.change_pressure_tag("initalizing")
+    hw.change_pressure_tag("")
     combos = [
         {
             "rack": ctx.load_labware(
@@ -104,7 +104,6 @@ def run(ctx: ProtocolContext) -> None:
 
             # PICK-UP TIP
             pipette.configure_for_volume(volume)
-            hw.change_pressure_tag(f"pickup-trial{trial}")
             pipette.pick_up_tip(rack[well_name])
 
             # PRE-WET
@@ -113,7 +112,7 @@ def run(ctx: ProtocolContext) -> None:
             for i in range(PRE_WET_COUNT):
                 ctx.delay(seconds=ASPIRATE_PRE_DELAY)
                 hw.change_pressure_tag(f"pre-aspirate-trial{trial}-{i}")
-                hw.pipette.aspirate(volume, aspirate_pos)
+                pipette.aspirate(volume, aspirate_pos)
                 ctx.delay(seconds=ASPIRATE_POST_DELAY)
                 push_out = 0 if i < PRE_WET_COUNT - 1 else PIP_PUSH_OUT
                 ctx.delay(seconds=DISPENSE_PRE_DELAY)
@@ -145,7 +144,7 @@ def run(ctx: ProtocolContext) -> None:
             ctx.delay(seconds=DISPENSE_POST_DELAY)
             hw.change_pressure_tag(f"blowout-trial{trial}")
             pipette.blow_out(blow_out_pos_dispense)
-            hw.change_pressure_tag("dropping")
+            hw.change_pressure_tag("")
             # DROP TIP
             pipette.drop_tip(rack[well_name], home_after=False)
 

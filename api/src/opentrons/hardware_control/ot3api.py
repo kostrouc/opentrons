@@ -470,13 +470,15 @@ class OT3API(
         return unregister
 
     def _log_pressure_data(self, pressure: int, sensor_id: int) -> None:
+        if self.pressure_logging_tag == "":
+            return
         self.csv_file_handle.write(
             f"{datetime.now().strftime('%H:%M:%S')},{self.pressure_logging_tag},{sensor_id},{pressure},\n"
         )
 
     def open_pressure_csv(self, filename: str) -> None:
         self.pressure_logging = True
-        self.pressure_logging_tag = "none"
+        self.pressure_logging_tag = ""
         self.csv_filepath = f"/data/hardware_testing/{filename}"
         self.csv_file_handle = open(self.csv_filepath, "w")
         self._backend.add_pressure_value_listener(self._log_pressure_data)

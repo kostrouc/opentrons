@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from typing import Tuple, Optional
 import datetime
 from serial import Serial  # type: ignore[import]
-
+import os
 from .commands import (
     RadwagCommand,
     RadwagWorkingMode,
@@ -87,6 +87,7 @@ class RadwagScale(RadwagScaleBase):
     def __init__(self, connection: Serial) -> None:
         """Constructor."""
         self._connection = connection
+        os.makedirs("/data/testing_data/", exist_ok=True)
         self._raw_log = open("/data/testing_data/scale_raw.txt", "w")
 
     @classmethod
