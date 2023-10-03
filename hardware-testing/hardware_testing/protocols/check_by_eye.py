@@ -3,7 +3,7 @@ from opentrons.protocol_api import ProtocolContext
 
 from opentrons.hardware_control.types import OT3Mount
 
-metadata = {"protocolName": "check-by-eye-dot-py"}
+metadata = {"protocolName": "SLOW-MIX-NO-PRE-DELAY-V2"}
 requirements = {"robotType": "Flex", "apiLevel": "2.15"}
 
 PIP_CHANNELS = 8
@@ -100,21 +100,23 @@ def run(ctx: ProtocolContext) -> None:
 
             # PRE-WET
             pipette.move_to(aspirate_pos)
-            ctx.delay(seconds=ASPIRATE_PRE_DELAY)
             for i in range(PRE_WET_COUNT):
+                ctx.delay(seconds=ASPIRATE_PRE_DELAY)
                 pipette.aspirate(volume, aspirate_pos)
+                ctx.delay(seconds=ASPIRATE_POST_DELAY)
                 push_out = 0 if i < PRE_WET_COUNT - 1 else PIP_PUSH_OUT
+                ctx.delay(seconds=DISPENSE_PRE_DELAY)
                 pipette.dispense(volume, aspirate_pos, push_out=push_out)
-            ctx.delay(seconds=DISPENSE_POST_DELAY)
+                ctx.delay(seconds=DISPENSE_POST_DELAY)
             pipette.blow_out(blow_out_pos_pre_wet)
             # FIXME: need to be able to do this in Protocol API
-            if not ctx.is_simulating():
-                hw_mount = OT3Mount.LEFT if pipette.mount == "left" else OT3Mount.RIGHT
-                ctx._core.get_hardware().prepare_for_aspirate(hw_mount)
+            # if not ctx.is_simulating():
+            #     hw_mount = OT3Mount.LEFT if pipette.mount == "left" else OT3Mount.RIGHT
+            #     ctx._core.get_hardware().prepare_for_aspirate(hw_mount)
 
             # ASPIRATE
-            pipette.move_to(aspirate_pos)
-            ctx.delay(seconds=ASPIRATE_PRE_DELAY)
+            # pipette.move_to(aspirate_pos)
+            # ctx.delay(seconds=ASPIRATE_PRE_DELAY)
             pipette.aspirate(volume, aspirate_pos)
             ctx.delay(seconds=ASPIRATE_POST_DELAY)
             pipette.move_to(blow_out_pos_dispense)
