@@ -15,6 +15,7 @@ from typing import (
     Set,
     Union,
     Mapping,
+    Callable,
 )
 
 from opentrons.config.types import OT3Config, GantryLoad
@@ -255,6 +256,12 @@ class OT3Simulator:
         """Update motor position estimation for commanded nodes, and update cache of data."""
         # Simulate conditions as if there are no stalls, aka do nothing
         return None
+
+    def add_pressure_value_listener(self, callback: Callable[[int, int], None]) -> None:
+        pass
+
+    def close_pressure_listener(self) -> None:
+        pass
 
     def _get_motor_status(
         self, axes: Sequence[Axis]

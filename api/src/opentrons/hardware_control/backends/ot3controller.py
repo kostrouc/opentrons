@@ -97,11 +97,15 @@ from opentrons_hardware.firmware_bindings.constants import (
 )
 from opentrons_hardware.firmware_bindings.messages.message_definitions import (
     StopRequest,
+    ReadFromSensorResponse,
 )
 from opentrons_hardware.firmware_bindings.messages.payloads import EmptyPayload
 from opentrons_hardware.hardware_control import status_bar
 
 from opentrons_hardware.firmware_bindings.binary_constants import BinaryMessageId
+from opentrons_hardware.firmware_bindings.messages import MessageDefinition
+from opentrons_hardware.firmware_bindings.arbitration_id import ArbitrationId
+from opentrons_hardware.firmware_bindings.constants import MessageId, SensorType
 from opentrons_hardware.firmware_bindings.messages.binary_message_definitions import (
     BinaryMessageDefinition,
     DoorSwitchStateInfo,
@@ -1284,6 +1288,26 @@ class OT3Controller:
                     message_id == BinaryMessageId.door_switch_state_info
                 ),
             )
+
+    def _pressure_listener(self, msg: MessageDefinition, arb_id: ArbitrationId) -> None:
+        RFSR = cast(ReadFromSensorResponse, msg)
+        if SensorType(RFSR.payload.sensor.value) is SensorType.pressure:
+            self.pressure_callback(
+                RFSR.payload.sensor_data.value, RFSR.payload.sensor_id.value
+            )
+
+    def add_pressure_value_listener(self, callback: Callable[[int, int], None]) -> None:
+        self.pressure_listener = self._pressure_listener
+        self.pressure_callback = callback
+
+        if self._messenger is not None:
+            self._messenger.add_listener(
+                self.pressure_listener,
+                lambda message_id: bool(message_id == MessageId.read_sensor_response),
+            )
+
+    def close_pressure_listener(self) -> None:
+        self._messenger.remove_listener(self.pressure_listener)
 
     def status_bar_interface(self) -> status_bar.StatusBar:
         return self._status_bar

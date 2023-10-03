@@ -1,6 +1,6 @@
 """Check by Eye dot Py."""
 from opentrons.protocol_api import ProtocolContext
-
+from datetime import datetime
 from opentrons.hardware_control.types import OT3Mount
 
 metadata = {"protocolName": "SLOW-MIX-NO-PRE-DELAY-V3"}
@@ -45,7 +45,7 @@ RACK_AND_PLATE_SLOTS = [  # [rack, plate]
     ["B2", "C2"],
     ["B3", "C3"],
     ["A1", "D2"],
-    ["A2", "D3"]
+    ["A2", "D3"],
 ]
 
 HEIGHT_OF_200UL_IN_PLATE_MM = 6.04  # height of 200ul in a Corning 96-well flat-bottom
@@ -58,7 +58,11 @@ def run(ctx: ProtocolContext) -> None:
     """Run."""
     pipette = ctx.load_instrument(f"flex_{PIP_CHANNELS}channel_{PIP_VOLUME}", PIP_MOUNT)
     reservoir = ctx.load_labware(RESERVOIR_NAME, RESERVOIR_SLOT)
-
+    hw = ctx._core.get_hardware()
+    hw.open_pressure_csv(
+        f"{metadata['protocolName']}-{datetime.now().strftime('%H:%M:%S')}"
+    )
+    hw.change_pressure_tag("initalizing")
     combos = [
         {
             "rack": ctx.load_labware(
@@ -87,8 +91,12 @@ def run(ctx: ProtocolContext) -> None:
             well_name = f"{row}{column}"
 
             # CRITICAL POSITIONS
-            aspirate_pos = reservoir[RESERVOIR_WELL].top(ASPIRATE_DEPTH + RESERVOIR_LPC_OFFSET)
-            blow_out_pos_pre_wet = reservoir[RESERVOIR_WELL].top(BLOW_OUT_HEIGHT + RESERVOIR_LPC_OFFSET)
+            aspirate_pos = reservoir[RESERVOIR_WELL].top(
+                ASPIRATE_DEPTH + RESERVOIR_LPC_OFFSET
+            )
+            blow_out_pos_pre_wet = reservoir[RESERVOIR_WELL].top(
+                BLOW_OUT_HEIGHT + RESERVOIR_LPC_OFFSET
+            )
             dispense_pos = plate[well_name].bottom(
                 HEIGHT_OF_200UL_IN_PLATE_MM + DISPENSE_DEPTH
             )
@@ -96,18 +104,23 @@ def run(ctx: ProtocolContext) -> None:
 
             # PICK-UP TIP
             pipette.configure_for_volume(volume)
+            hw.change_pressure_tag(f"pickup-trial{trial}")
             pipette.pick_up_tip(rack[well_name])
 
             # PRE-WET
+            hw.change_pressure_tag(f"aspirate-pos-trial{trial}")
             pipette.move_to(aspirate_pos)
             for i in range(PRE_WET_COUNT):
                 ctx.delay(seconds=ASPIRATE_PRE_DELAY)
-                pipette.aspirate(volume, aspirate_pos)
+                hw.change_pressure_tag(f"pre-aspirate-trial{trial}-{i}")
+                hw.pipette.aspirate(volume, aspirate_pos)
                 ctx.delay(seconds=ASPIRATE_POST_DELAY)
                 push_out = 0 if i < PRE_WET_COUNT - 1 else PIP_PUSH_OUT
                 ctx.delay(seconds=DISPENSE_PRE_DELAY)
+                hw.change_pressure_tag(f"pre-dispense-trial{trial}-{i}")
                 pipette.dispense(volume, aspirate_pos, push_out=push_out)
                 ctx.delay(seconds=DISPENSE_POST_DELAY)
+            hw.change_pressure_tag(f"pre-blowout-trial{trial}")
             pipette.blow_out(blow_out_pos_pre_wet)
             # FIXME: need to be able to do this in Protocol API
             # if not ctx.is_simulating():
@@ -117,16 +130,23 @@ def run(ctx: ProtocolContext) -> None:
             # ASPIRATE
             # pipette.move_to(aspirate_pos)
             # ctx.delay(seconds=ASPIRATE_PRE_DELAY)
+            hw.change_pressure_tag(f"aspirate-trial{trial}")
             pipette.aspirate(volume, aspirate_pos)
             ctx.delay(seconds=ASPIRATE_POST_DELAY)
+            hw.change_pressure_tag(f"blow_out_pos_dispense-trial{trial}")
             pipette.move_to(blow_out_pos_dispense)
 
             # DISPENSE
+            hw.change_pressure_tag(f"dispense-pos-trial{trial}")
             pipette.move_to(dispense_pos)
             ctx.delay(seconds=DISPENSE_PRE_DELAY)
+            hw.change_pressure_tag(f"dispense-trial{trial}")
             pipette.dispense(volume, dispense_pos, push_out=PIP_PUSH_OUT)
             ctx.delay(seconds=DISPENSE_POST_DELAY)
+            hw.change_pressure_tag(f"blowout-trial{trial}")
             pipette.blow_out(blow_out_pos_dispense)
-
+            hw.change_pressure_tag("dropping")
             # DROP TIP
             pipette.drop_tip(rack[well_name], home_after=False)
+
+    hw.close_pressure_csv()
