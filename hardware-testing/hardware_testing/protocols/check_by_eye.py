@@ -3,7 +3,7 @@ from opentrons.protocol_api import ProtocolContext
 
 from opentrons.hardware_control.types import OT3Mount
 
-metadata = {"protocolName": "SLOW-MIX-NO-PRE-DELAY-V2"}
+metadata = {"protocolName": "SLOW-MIX-NO-PRE-DELAY-V3"}
 requirements = {"robotType": "Flex", "apiLevel": "2.15"}
 
 PIP_CHANNELS = 8
@@ -16,8 +16,8 @@ TIP_VOLUME = 50
 # NOTE: pipette will loop through volumes
 #       circling back to the first, regardless of which well it is at
 #       so number of volumes can be any length you like (example: [1])
-TEST_VOLUMES = [0.5]
-PRE_WET_VOLUMES = [0.3]
+TEST_VOLUMES = [1.0]
+PRE_WET_VOLUMES = [1.0]
 PRE_WET_COUNT = 5
 
 # FIXME: operator must LPC to liquid-surface in reservoir in order for this to work
