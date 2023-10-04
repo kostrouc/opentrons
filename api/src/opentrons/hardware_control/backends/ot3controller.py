@@ -1303,7 +1303,7 @@ class OT3Controller:
         if self._messenger is not None:
             self._messenger.add_listener(
                 self.pressure_listener,
-                lambda message_id: bool(message_id == MessageId.read_sensor_response),
+                lambda arbitration_id: bool(arbitration_id.parts.message_id == MessageId.read_sensor_response),
             )
 
     def close_pressure_listener(self) -> None:

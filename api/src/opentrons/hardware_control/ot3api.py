@@ -471,6 +471,7 @@ class OT3API(
 
     def _log_pressure_data(self, pressure: int, sensor_id: int) -> None:
         if self.pressure_logging_tag == "":
+            self._log.info("Not logging pressure, no tag")
             return
         self.csv_file_handle.write(
             f"{datetime.now().strftime('%H:%M:%S')},{self.pressure_logging_tag},{sensor_id},{pressure},\n"
@@ -484,6 +485,7 @@ class OT3API(
         self._backend.add_pressure_value_listener(self._log_pressure_data)
 
     def change_pressure_tag(self, tag: str) -> None:
+        self._log.info(f"Setting pressure tag {tag}")
         self.pressure_logging_tag = tag
 
     def close_pressure_csv(self) -> None:
