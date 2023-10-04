@@ -474,7 +474,7 @@ class OT3API(
             self._log.info("Not logging pressure, no tag")
             return
         self.csv_file_handle.write(
-            f"{datetime.now().strftime('%H:%M:%S')},{self.pressure_logging_tag},{sensor_id},{pressure},\n"
+            f"{datetime.now().strftime('%H:%M:%S.%f')},{self.pressure_logging_tag},{sensor_id},{pressure},\n"
         )
 
     def open_pressure_csv(self, filename: str) -> None:
