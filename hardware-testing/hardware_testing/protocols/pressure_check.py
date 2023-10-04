@@ -80,7 +80,7 @@ def run(ctx: ProtocolContext) -> None:
         rack = combo["rack"]
         num_trials = 12 if PIP_CHANNELS == 8 else 96
         for trial in range(num_trials):
-            csv_sub_string = f"plate-{plate.parent}-trial-{trial + 1}"
+            csv_sub_string = f"plate-{plate.parent}-trial{trial + 1}"
 
             # CHOOSE VOLUME
             volume = TEST_VOLUMES[vol_cnt % len(TEST_VOLUMES)]
