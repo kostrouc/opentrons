@@ -26,6 +26,7 @@ class TestSection(enum.Enum):
     ENVIRONMENT_SENSOR = "ENVIRONMENT-SENSOR"
     TIP_SENSOR = "TIP-SENSOR"
     DROPLETS = "DROPLETS"
+    LIQUID_LEVEL = "LIQUID-LEVEL"
 
 
 @dataclass
@@ -65,6 +66,10 @@ TESTS = [
         TestSection.DROPLETS,
         test_droplets.run,
     ),
+    (
+        TestSection.LIQUID_LEVEL,
+        test_liquid_level.run,
+    ),
 ]
 
 
@@ -94,6 +99,9 @@ def build_report(test_name: str) -> CSVReport:
             ),
             CSVSection(
                 title=TestSection.DROPLETS.value, lines=test_droplets.build_csv_lines()
+            ),
+            CSVSection(
+                title=TestSection.LIQUID_LEVEL.value, lines=test_liquid_level.build_csv_lines()
             ),
         ],
     )
