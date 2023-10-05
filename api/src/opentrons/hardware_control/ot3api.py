@@ -2315,6 +2315,17 @@ class OT3API(
         if not probe_settings:
             probe_settings = self.config.liquid_sense
 
+        # check that we won't run out of plunger space before reaching Z target
+        pipette = self._pipette_handler.get_pipette(mount)
+        p_dist = pipette.plunger_positions.bottom - pipette.plunger_positions.top
+        p_speed = probe_settings.plunger_speed
+        z_speed = probe_settings.mount_speed
+        actual_max_z_dist = (p_dist / p_speed) * z_speed
+        if probe_settings.max_z_distance > actual_max_z_dist:
+            raise RuntimeError(f"liquid probe Z cannot travel "
+                               f"{probe_settings.max_z_distance}mm "
+                               f"(max={round(actual_max_z_dist, 2)}mm)")
+
         pos = await self.gantry_position(mount, refresh=True)
         probe_start_pos = pos._replace(z=probe_settings.starting_mount_height)
         await self.move_to(mount, probe_start_pos)
