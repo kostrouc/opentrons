@@ -1,10 +1,11 @@
 """Check by Eye dot Py."""
 from opentrons.protocol_api import ProtocolContext
 from datetime import datetime
-from opentrons.hardware_control.types import OT3Mount
 
-metadata = {"protocolName": "PRESSURE-CHECK-V1"}
+metadata = {"protocolName": "PRESSURE-CHECK-V2"}
 requirements = {"robotType": "Flex", "apiLevel": "2.15"}
+
+DEBUG_CHECK_PRESSURE = True
 
 PIP_CHANNELS = 8
 PIP_VOLUME = 50
@@ -17,6 +18,7 @@ TIP_VOLUME = 50
 #       circling back to the first, regardless of which well it is at
 #       so number of volumes can be any length you like (example: [1])
 TEST_VOLUMES = [0.5]
+PRE_WET_COUNT = 5
 
 # FIXME: operator must LPC to liquid-surface in reservoir in order for this to work
 #        need to get liquid-probing working ASAP to fix this hack
@@ -28,9 +30,9 @@ ASPIRATE_FLOW_RATE = 35  # default for P50S and P50M is 35ul/sec
 DISPENSE_FLOW_RATE = 57  # default for P50S and P50M is 57ul/sec
 
 ASPIRATE_PRE_DELAY = 0.25
-ASPIRATE_POST_DELAY = 1.0
+ASPIRATE_POST_DELAY = 0.5
 DISPENSE_PRE_DELAY = 0.0
-DISPENSE_POST_DELAY = 0.5
+DISPENSE_POST_DELAY = 0.0
 
 RESERVOIR_SLOT = "D1"
 RESERVOIR_NAME = "nest_1_reservoir_195ml"
@@ -56,12 +58,17 @@ def run(ctx: ProtocolContext) -> None:
     """Run."""
     pipette = ctx.load_instrument(f"flex_{PIP_CHANNELS}channel_{PIP_VOLUME}", PIP_MOUNT)
     reservoir = ctx.load_labware(RESERVOIR_NAME, RESERVOIR_SLOT)
-    if not ctx.is_simulating():
+    if DEBUG_CHECK_PRESSURE and not ctx.is_simulating():
         hw = ctx._core.get_hardware()
         hw.open_pressure_csv(
             f"{metadata['protocolName']}-{datetime.now().strftime('%H:%M:%S')}"
         )
         hw.change_pressure_tag("")
+
+    def _tag_pressure(tag: str) -> None:
+        if DEBUG_CHECK_PRESSURE and not ctx.is_simulating():
+            hw.change_pressure_tag(tag)
+
     combos = [
         {
             "rack": ctx.load_labware(
@@ -95,6 +102,9 @@ def run(ctx: ProtocolContext) -> None:
             aspirate_pos = reservoir[RESERVOIR_WELL].top(
                 ASPIRATE_DEPTH + RESERVOIR_LPC_OFFSET
             )
+            blow_out_pos_pre_wet = reservoir[RESERVOIR_WELL].top(
+                BLOW_OUT_HEIGHT + RESERVOIR_LPC_OFFSET
+            )
             dispense_pos = plate[well_name].bottom(
                 HEIGHT_OF_200UL_IN_PLATE_MM + DISPENSE_DEPTH
             )
@@ -104,37 +114,51 @@ def run(ctx: ProtocolContext) -> None:
             pipette.configure_for_volume(volume)
             pipette.pick_up_tip(rack[well_name])
 
+            # PRE-WET
+            pipette.move_to(aspirate_pos)
+            _tag_pressure(f"pre-wet-{csv_sub_string}")
+            ctx.delay(seconds=ASPIRATE_PRE_DELAY)
+            for i in range(PRE_WET_COUNT):
+                pipette.aspirate(volume, aspirate_pos)
+                push_out = 0 if i < PRE_WET_COUNT - 1 else PIP_PUSH_OUT
+                pipette.dispense(volume, aspirate_pos, push_out=push_out)
+            ctx.delay(seconds=DISPENSE_POST_DELAY)
+            pipette.blow_out(blow_out_pos_pre_wet)
+            _tag_pressure("")
+
+            # PREPARE-TO-ASPIRATE
+            # FIXME: replace with "prepare-for-aspirate" once added to API
+            # NOTE: this hack moving 0.0001 ul is guaranteed to not create any
+            #       actual movement in the plunger, because it is smaller than
+            #       the minimum allowed movement (0.05 mm) set by software
+            pipette.aspirate(0.0001, blow_out_pos_pre_wet)
+            pipette.dispense(0.0001, blow_out_pos_pre_wet)
+
             # ASPIRATE
             pipette.move_to(aspirate_pos)
-            if not ctx.is_simulating():
-                hw.change_pressure_tag(f"aspirate-{csv_sub_string}")
+            _tag_pressure(f"aspirate-{csv_sub_string}")
             ctx.delay(seconds=ASPIRATE_PRE_DELAY)
             pipette.aspirate(volume, aspirate_pos)
             ctx.delay(seconds=ASPIRATE_POST_DELAY)
-            if not ctx.is_simulating():
-                hw.change_pressure_tag("")
+            _tag_pressure("")
             pipette.move_to(blow_out_pos_dispense)
 
             # DISPENSE
             pipette.move_to(dispense_pos)
-            if not ctx.is_simulating():
-                hw.change_pressure_tag(f"dispense-{csv_sub_string}")
+            _tag_pressure(f"dispense-{csv_sub_string}")
             ctx.delay(seconds=DISPENSE_PRE_DELAY)
             pipette.dispense(volume, dispense_pos, push_out=PIP_PUSH_OUT)
             ctx.delay(seconds=DISPENSE_POST_DELAY)
-            if not ctx.is_simulating():
-                hw.change_pressure_tag("")
+            _tag_pressure("")
 
             # BLOW-OUT
             pipette.move_to(blow_out_pos_dispense)
-            if not ctx.is_simulating():
-                hw.change_pressure_tag(f"blowout-{csv_sub_string}")
+            _tag_pressure(f"blowout-{csv_sub_string}")
             pipette.blow_out(blow_out_pos_dispense)
-            if not ctx.is_simulating():
-                hw.change_pressure_tag("")
+            _tag_pressure("")
 
             # DROP TIP
             pipette.drop_tip(rack[well_name], home_after=False)
 
-    if not ctx.is_simulating():
+    if DEBUG_CHECK_PRESSURE and not ctx.is_simulating():
         hw.close_pressure_csv()
