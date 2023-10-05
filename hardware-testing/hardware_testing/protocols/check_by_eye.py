@@ -60,7 +60,7 @@ def run(ctx: ProtocolContext) -> None:
     reservoir = ctx.load_labware(RESERVOIR_NAME, RESERVOIR_SLOT)
     hw = ctx._core.get_hardware()
     hw.open_pressure_csv(
-        f"{metadata['protocolName']}-{datetime.now().strftime('%H:%M:%S')}"
+        f"{metadata['protocolName']}-{datetime.now().strftime('%H-%M-%S')}"
     )
     hw.change_pressure_tag("")
     combos = [

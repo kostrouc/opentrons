@@ -61,7 +61,7 @@ def run(ctx: ProtocolContext) -> None:
     if DEBUG_CHECK_PRESSURE and not ctx.is_simulating():
         hw = ctx._core.get_hardware()
         hw.open_pressure_csv(
-            f"{metadata['protocolName']}-{datetime.now().strftime('%H:%M:%S')}.csv"
+            f"{metadata['protocolName']}-{datetime.now().strftime('%H-%M-%S')}.csv"
         )
         hw.change_pressure_tag("")
 
