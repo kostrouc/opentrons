@@ -2,7 +2,7 @@
 from opentrons.protocol_api import ProtocolContext
 from datetime import datetime
 
-metadata = {"protocolName": "PRESSURE-CHECK-V2"}
+metadata = {"protocolName": "PRESSURE-CHECK-V3"}
 requirements = {"robotType": "Flex", "apiLevel": "2.15"}
 
 DEBUG_CHECK_PRESSURE = True
@@ -132,7 +132,7 @@ def run(ctx: ProtocolContext) -> None:
             #       actual movement in the plunger, because it is smaller than
             #       the minimum allowed movement (0.05 mm) set by software
             pipette.aspirate(0.0001, blow_out_pos_pre_wet)
-            pipette.dispense(0.0001, blow_out_pos_pre_wet)
+            pipette.dispense(0.0001, blow_out_pos_pre_wet, push_out=0)
 
             # ASPIRATE
             pipette.move_to(aspirate_pos)
