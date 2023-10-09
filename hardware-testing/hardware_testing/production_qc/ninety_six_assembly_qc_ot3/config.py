@@ -13,6 +13,7 @@ from . import (
     test_environmental_sensor,
     test_tip_sensor,
     test_droplets,
+    test_liquid_level,
 )
 
 
@@ -101,7 +102,8 @@ def build_report(test_name: str) -> CSVReport:
                 title=TestSection.DROPLETS.value, lines=test_droplets.build_csv_lines()
             ),
             CSVSection(
-                title=TestSection.LIQUID_LEVEL.value, lines=test_liquid_level.build_csv_lines()
+                title=TestSection.LIQUID_LEVEL.value,
+                lines=test_liquid_level.build_csv_lines(),
             ),
         ],
     )

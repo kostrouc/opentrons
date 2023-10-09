@@ -17,7 +17,7 @@ LABWARE_SLOT = 2
 CHANNEL_OFFSET = {
     1: Point(),
     8: Point(y=9 * 7 * 0.5),
-    96: Point(x=9 * -11 * 0.5, y=9 * 7 * 0.5)
+    96: Point(x=9 * -11 * 0.5, y=9 * 7 * 0.5),
 }
 
 
