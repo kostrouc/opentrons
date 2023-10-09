@@ -161,5 +161,3 @@ async def run(api: OT3API, report: CSVReport, section: str) -> None:
         for _trial in range(TRIALS):
             trial = _trial + 1  # _trial is 0 indexed
             await test_tip(tip_type["tip"], tip_type["slot"], trial)
-        if not api.is_simulator:
-            ui.get_user_ready(f"Replace {tip}uL tips in positions {LABWARE_SENSOR_WELLS['PRIMARY']} and {LABWARE_SENSOR_WELLS['SECONDARY']}")
