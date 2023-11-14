@@ -62,9 +62,15 @@ async def _exercise_gripper(api: OT3API) -> None:
 
 
 async def _main(
-    is_simulating: bool, mount: types.OT3Mount, speed: Optional[float]
+    is_simulating: bool, mount: types.OT3Mount, speed: Optional[float], remove_function: bool = True
 ) -> None:
-    api = await helpers_ot3.build_async_ot3_hardware_api(is_simulating=is_simulating)
+    api = await helpers_ot3.build_async_ot3_hardware_api(
+        is_simulating=is_simulating,
+        pipette_left="p1000_single_v3.5"
+    )
+    if remove_function:
+        print(f"erasing pipette function on mount {mount.name}")
+        helpers_ot3.clear_pipette_ul_per_mm(api, mount)
     await api.home()
     while True:
         await helpers_ot3.jog_mount_ot3(api, mount, speed=speed)
@@ -86,6 +92,7 @@ if __name__ == "__main__":
         "--mount", type=str, choices=list(mount_options.keys()), default="left"
     )
     parser.add_argument("--speed", type=float)
+    parser.add_argument("--no-function", action="store_true")
     args = parser.parse_args()
     _mount = mount_options[args.mount]
-    asyncio.run(_main(args.simulate, _mount, args.speed))
+    asyncio.run(_main(args.simulate, _mount, args.speed, args.no_function))
