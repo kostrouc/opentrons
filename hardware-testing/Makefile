@@ -102,6 +102,7 @@ test-photometric:
 	-$(MAKE) apply-patches-gravimetric
 	$(python) -m hardware_testing.gravimetric --photometric --simulate --pipette 1000 --channels 96 --tip 50 --trials 1
 	$(python) -m hardware_testing.gravimetric --photometric --simulate --pipette 1000 --channels 96 --tip 200 --trials 1
+	$(python) -m hardware_testing.gravimetric --photometric --simulate --pipette 1000 --channels 96 --tip 1000 --trials 1
 	-$(MAKE) remove-patches-gravimetric
 
 .PHONY: test-gravimetric-single
