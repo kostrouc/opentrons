@@ -322,7 +322,7 @@ def _get_volumes(
             pipette_channels, pipette_volume, tip_volume, mode=mode
         )
     elif user_volumes:
-        if ctx.is_simulating():
+        if ctx.is_simulating() and False:
             rand_vols = [round(random() * tip_volume, 1) for _ in range(randint(1, 3))]
             _inp = ",".join([str(r) for r in rand_vols])
         else:

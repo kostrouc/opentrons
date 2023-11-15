@@ -174,6 +174,7 @@ def _pipette_with_liquid_settings(  # noqa: C901
     touch_tip: bool = False,
     mode: str = "",
     clear_accuracy_function: bool = False,
+    multi_dispense_backlash_ul: float = 0.0,
 ) -> None:
     """Run a pipette given some Pipetting Liquid Settings."""
     # FIXME: stop using hwapi, and get those functions into core software
@@ -232,6 +233,7 @@ def _pipette_with_liquid_settings(  # noqa: C901
 
     # CREATE CALLBACKS FOR EACH PHASE
     def _aspirate_on_approach() -> None:
+        print(f"_aspirate_on_approach: {pipette.current_volume}")
         if hw_pipette.current_volume > 0:
             print(
                 "WARNING: removing trailing air-gap from pipette, "
@@ -249,8 +251,10 @@ def _pipette_with_liquid_settings(  # noqa: C901
         hw_api.prepare_for_aspirate(hw_mount)
         if liquid_class.aspirate.leading_air_gap > 0:
             pipette.aspirate(liquid_class.aspirate.leading_air_gap)
+        print(f"END: {pipette.current_volume}")
 
     def _aspirate_on_mix() -> None:
+        print(f"_aspirate_on_mix: {pipette.current_volume}")
         callbacks.on_mixing()
         _submerge(pipette, well, submerge_mm, channel_offset, submerge_speed)
         _num_mixes = 5
@@ -258,7 +262,7 @@ def _pipette_with_liquid_settings(  # noqa: C901
             pipette.aspirate(mix)
             ctx.delay(liquid_class.aspirate.delay)
             if i < _num_mixes - 1:
-                pipette.dispense(mix)
+                pipette.dispense(mix, push_out=0)
             else:
                 _dispense_with_added_blow_out()
             ctx.delay(liquid_class.dispense.delay)
@@ -269,40 +273,59 @@ def _pipette_with_liquid_settings(  # noqa: C901
         _blow_out_remaining_air()
         hw_api.prepare_for_aspirate(hw_mount)
         assert pipette.current_volume == 0
+        print(f"END: {pipette.current_volume}")
 
     def _aspirate_on_submerge() -> None:
+        print(f"_aspirate_on_submerge: {pipette.current_volume}")
         # aspirate specified volume
         callbacks.on_aspirating()
-        pipette.aspirate(aspirate)
+        pipette.aspirate(aspirate + multi_dispense_backlash_ul)
+        ctx.delay(liquid_class.aspirate.delay)
+        # NOTE: for multi-dispense, remove the "backlash" liquid
+        if multi_dispense_backlash_ul:
+            pipette.dispense(multi_dispense_backlash_ul)
+            ctx.delay(liquid_class.dispense.delay)
         # update liquid-height tracker
         liquid_tracker.update_affected_wells(
             well, aspirate=aspirate, channels=channel_count
         )
-        # delay
-        ctx.delay(liquid_class.aspirate.delay)
+        print(f"END: {pipette.current_volume}")
 
     def _aspirate_on_retract() -> None:
+        print(f"_aspirate_on_retract: {pipette.current_volume}")
         # add trailing-air-gap
+        print(liquid_class.aspirate.trailing_air_gap, multi_dispense_backlash_ul)
+        if liquid_class.aspirate.trailing_air_gap and multi_dispense_backlash_ul:
+            raise RuntimeError("should not add trialing air-gap after"
+                               "just dispensing the multi_dispense_backlash_ul")
+        print(f"before aspirate: {pipette.current_volume} ({liquid_class.aspirate.trailing_air_gap})")
         pipette.aspirate(liquid_class.aspirate.trailing_air_gap)
+        print(f"after aspirate: {pipette.current_volume}")
+        print(f"END: {pipette.current_volume}")
 
     def _dispense_on_approach() -> None:
+        print(f"_dispense_on_approach: {pipette.current_volume}")
         # remove trailing-air-gap
         pipette.dispense(liquid_class.aspirate.trailing_air_gap)
+        print(f"END: {pipette.current_volume}")
 
     def _dispense_on_submerge() -> None:
         callbacks.on_dispensing()
+        print(f"_dispense_on_submerge: {pipette.current_volume}")
         if added_blow_out:
             _dispense_with_added_blow_out()
         else:
-            pipette.dispense(dispense)
+            pipette.dispense(dispense, push_out=0)
         # update liquid-height tracker
         liquid_tracker.update_affected_wells(
             well, dispense=dispense, channels=channel_count
         )
         # delay
         ctx.delay(liquid_class.dispense.delay)
+        print(f"END: {pipette.current_volume}")
 
     def _dispense_on_retract() -> None:
+        print(f"_dispense_on_retract: {pipette.current_volume}")
         if pipette.current_volume <= 0 and added_blow_out:
             # blow-out any remaining air in pipette (any reason why not?)
             callbacks.on_blowing_out()
@@ -313,6 +336,7 @@ def _pipette_with_liquid_settings(  # noqa: C901
         # NOTE: always do a trailing-air-gap, regardless of if tip is empty or not
         #       to avoid droplets from forming and falling off the tip
         pipette.aspirate(liquid_class.aspirate.trailing_air_gap)
+        print(f"END: {pipette.current_volume}")
 
     # PHASE 1: APPROACH
     pipette.flow_rate.aspirate = liquid_class.aspirate.plunger_flow_rate
@@ -390,12 +414,16 @@ def aspirate_with_liquid_class(
     touch_tip: bool = False,
     mode: str = "",
     clear_accuracy_function: bool = False,
+    trailing_air_gap_ul: Optional[float] = None,
+    multi_dispense_backlash_ul: float = 0.0,
 ) -> None:
     """Aspirate with liquid class."""
     pip_size = 50 if "50" in pipette.name else 1000
     liquid_class = get_liquid_class(
         pip_size, pipette.channels, tip_volume, int(aspirate_volume)
     )
+    if trailing_air_gap_ul is not None:
+        liquid_class.aspirate.trailing_air_gap = trailing_air_gap_ul
     _pipette_with_liquid_settings(
         ctx,
         pipette,
@@ -410,6 +438,7 @@ def aspirate_with_liquid_class(
         touch_tip=touch_tip,
         mode=mode,
         clear_accuracy_function=clear_accuracy_function,
+        multi_dispense_backlash_ul=multi_dispense_backlash_ul,
     )
 
 
@@ -428,12 +457,15 @@ def dispense_with_liquid_class(
     touch_tip: bool = False,
     mode: str = "",
     clear_accuracy_function: bool = False,
+    trailing_air_gap_ul: Optional[float] = None,
 ) -> None:
     """Dispense with liquid class."""
     pip_size = 50 if "50" in pipette.name else 1000
     liquid_class = get_liquid_class(
         pip_size, pipette.channels, tip_volume, int(dispense_volume)
     )
+    if trailing_air_gap_ul is not None:
+        liquid_class.aspirate.trailing_air_gap = trailing_air_gap_ul
     _pipette_with_liquid_settings(
         ctx,
         pipette,

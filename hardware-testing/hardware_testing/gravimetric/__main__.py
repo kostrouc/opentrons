@@ -138,6 +138,8 @@ class RunArgs:
     ctx: ProtocolContext
     protocol_cfg: Any
     test_report: report.CSVReport
+    multi_dispense_backlash_ul: float
+    multi_dispense_ul: float
 
     @classmethod
     def _get_protocol_context(cls, args: argparse.Namespace) -> ProtocolContext:
@@ -356,6 +358,8 @@ class RunArgs:
             ctx=_ctx,
             protocol_cfg=protocol_cfg,
             test_report=report,
+            multi_dispense_backlash_ul=args.multi_dispense_backlash_ul,
+            multi_dispense_ul=args.multi_dispense_ul,
         )
 
 
@@ -405,6 +409,8 @@ def build_gravimetric_cfg(
         same_tip=same_tip,
         ignore_fail=ignore_fail,
         mode=mode,
+        multi_dispense_backlash_ul=run_args.multi_dispense_backlash_ul,
+        multi_dispense_ul=run_args.multi_dispense_ul,
     )
 
 
@@ -574,6 +580,8 @@ if __name__ == "__main__":
         "--mode", type=str, choices=["", "default", "lowVolumeDefault"], default=""
     )
     parser.add_argument("--pre-heat", action="store_true")
+    parser.add_argument("--multi-dispense-backlash-ul", type=float, default=0.0)
+    parser.add_argument("--multi-dispense-ul", type=float, default=0.0)
     args = parser.parse_args()
     run_args = RunArgs.build_run_args(args)
     if not run_args.ctx.is_simulating():

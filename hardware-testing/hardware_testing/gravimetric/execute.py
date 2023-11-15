@@ -354,37 +354,61 @@ def _run_trial(
         blank=trial.blank,
         mode=trial.mode,
         clear_accuracy_function=trial.cfg.increment,
+        multi_dispense_backlash_ul=trial.multi_dispense_backlash_ul,
+        trailing_air_gap_ul=0.0 if trial.multi_dispense_backlash_ul else None,
     )
     trial.ctx._core.get_hardware().retract(mnt)  # retract to top of gantry
 
     _take_photos(trial, "aspirate")
     m_data_aspirate = _record_measurement_and_store(MeasurementType.ASPIRATE)
+    volume_aspirate = calculate_change_in_volume(m_data_init, m_data_aspirate)
     ui.print_info(f"\tgrams after aspirate: {m_data_aspirate.grams_average} g")
     ui.print_info(f"\tcelsius after aspirate: {m_data_aspirate.celsius_pipette} C")
+    ui.print_info(f"\tvolume after aspirate: {volume_aspirate} ul")
 
     # RUN DISPENSE
-    dispense_with_liquid_class(
-        trial.ctx,
-        trial.pipette,
-        trial.tip_volume,
-        trial.volume,
-        trial.well,
-        trial.channel_offset,
-        trial.channel_count,
-        trial.liquid_tracker,
-        callbacks=pipetting_callbacks,
-        blank=trial.blank,
-        mode=trial.mode,
-        clear_accuracy_function=trial.cfg.increment,
-    )
-    trial.ctx._core.get_hardware().retract(mnt)  # retract to top of gantry
-    _take_photos(trial, "dispense")
-    m_data_dispense = _record_measurement_and_store(MeasurementType.DISPENSE)
-    ui.print_info(f"\tgrams after dispense: {m_data_dispense.grams_average} g")
-    # calculate volumes
-    volume_aspirate = calculate_change_in_volume(m_data_init, m_data_aspirate)
-    volume_dispense = calculate_change_in_volume(m_data_aspirate, m_data_dispense)
-    return volume_aspirate, m_data_aspirate, volume_dispense, m_data_dispense
+    if trial.multi_dispense_ul:
+        dispense_volume = trial.multi_dispense_ul
+    else:
+        dispense_volume = trial.volume
+    m_data_dispense: List[MeasurementData] = []
+    dispense_volumes: List[float] = []
+    count = 0
+    while trial.pipette.current_volume > 0:
+        print(f"current pipette volume: {trial.pipette.current_volume}")
+        count += 1
+        dispense_with_liquid_class(
+            trial.ctx,
+            trial.pipette,
+            trial.tip_volume,
+            min(dispense_volume, trial.pipette.current_volume),
+            trial.well,
+            trial.channel_offset,
+            trial.channel_count,
+            trial.liquid_tracker,
+            callbacks=pipetting_callbacks,
+            blank=trial.blank,
+            mode=trial.mode,
+            # clear_accuracy_function=trial.cfg.increment,
+            clear_accuracy_function=True,  # TODO: delete this
+            trailing_air_gap_ul=0.0 if trial.multi_dispense_backlash_ul else None,
+            added_blow_out=False if trial.multi_dispense_backlash_ul else None,
+        )
+        trial.ctx._core.get_hardware().retract(mnt)  # retract to top of gantry
+        _take_photos(trial, "dispense")
+        m_data_dispense.append(_record_measurement_and_store(MeasurementType.DISPENSE))
+        if len(m_data_dispense) == 1:
+            disp_vol = calculate_change_in_volume(m_data_aspirate, m_data_dispense[-1])
+        else:
+            disp_vol = calculate_change_in_volume(m_data_dispense[-2], m_data_dispense[-1])
+        dispense_volumes.append(disp_vol)
+        ui.print_info(f"\t[{count}] grams after dispense: {m_data_dispense[-1].grams_average} g")
+        ui.print_info(f"\t[{count}] celsius after aspirate: {m_data_aspirate.celsius_pipette} C")
+        ui.print_info(f"\t[{count}] volume after dispense: {dispense_volumes[-1]} ul")
+        input("ENTER to continue:")
+
+    volume_dispense_avg = sum(dispense_volumes) / len(dispense_volumes)
+    return volume_aspirate, m_data_aspirate, volume_dispense_avg, m_data_dispense[-1]
 
 
 def _get_test_channels(cfg: config.GravimetricConfig) -> List[int]:
@@ -654,6 +678,8 @@ def run(cfg: config.GravimetricConfig, resources: TestResources) -> None:  # noq
             liquid_tracker,
             False,
             resources.env_sensor,
+            multi_dispense_backlash_ul=cfg.multi_dispense_backlash_ul,
+            multi_dispense_ul=cfg.multi_dispense_ul,
         )
         for volume in trials.keys():
             actual_asp_list_all = []

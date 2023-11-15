@@ -26,6 +26,8 @@ class VolumetricTrial:
     channel_count: int
     tip_volume: int
     volume: float
+    multi_dispense_backlash_ul: float
+    multi_dispense_ul: float
     mix: bool
     acceptable_cv: Optional[float]
     acceptable_d: Optional[float]
@@ -89,6 +91,8 @@ def build_gravimetric_trials(
     liquid_tracker: LiquidTracker,
     blank: bool,
     env_sensor: asair_sensor.AsairSensorBase,
+    multi_dispense_backlash_ul: float = 0.0,
+    multi_dispense_ul: float = 0.0,
 ) -> Dict[float, Dict[int, List[GravimetricTrial]]]:
     """Build a list of all the trials that will be run."""
     trial_list: Dict[float, Dict[int, List[GravimetricTrial]]] = {}
@@ -107,6 +111,8 @@ def build_gravimetric_trials(
                     channel_offset=Point(),
                     tip_volume=cfg.tip_volume,
                     volume=test_volumes[-1],
+                    multi_dispense_backlash_ul=multi_dispense_backlash_ul,
+                    multi_dispense_ul=multi_dispense_ul,
                     channel=0,
                     channel_count=num_channels_per_transfer,
                     trial=trial,
@@ -160,6 +166,8 @@ def build_gravimetric_trials(
                             channel_offset=channel_offset,
                             tip_volume=cfg.tip_volume,
                             volume=volume,
+                            multi_dispense_backlash_ul=multi_dispense_backlash_ul,
+                            multi_dispense_ul=multi_dispense_ul,
                             channel=channel,
                             channel_count=num_channels_per_transfer,
                             trial=trial,

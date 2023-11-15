@@ -30,4 +30,4 @@ def piecewise_volume_conversion(
 
     # Compatibility with previous implementation of search.
     #  list(filter(lambda x: ul <= x[0], sequence))[0]
-    raise IndexError()
+    raise IndexError(f"unable to find {ul} within sequence (max: {sequence[-1][0]} ul)")
