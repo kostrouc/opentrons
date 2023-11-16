@@ -271,14 +271,14 @@ def _run_trial(
         trial.blank,
     )
 
-    def _tag(m_type: MeasurementType) -> str:
+    def _tag(m_type: MeasurementType, extra: str = "") -> str:
         tag = create_measurement_tag(
-            m_type, None if trial.blank else trial.volume, trial.channel, trial.trial
+            m_type, None if trial.blank else trial.volume, trial.channel, trial.trial, extra=extra
         )
         return tag
 
-    def _record_measurement_and_store(m_type: MeasurementType) -> MeasurementData:
-        m_tag = _tag(m_type)
+    def _record_measurement_and_store(m_type: MeasurementType, extra: str = "") -> MeasurementData:
+        m_tag = _tag(m_type, extra=extra)
         if trial.recorder.is_simulator and not trial.blank:
             if m_type == MeasurementType.ASPIRATE:
                 trial.recorder.add_simulation_mass(trial.volume * -0.001)
@@ -294,7 +294,7 @@ def _run_trial(
             shorten=False,  # TODO: remove this
             delay_seconds=trial.scale_delay,
         )
-        report.store_measurement(trial.test_report, m_tag, m_data)
+        # report.store_measurement(trial.test_report, m_tag, m_data)
         _MEASUREMENTS.append(
             (
                 m_tag,
@@ -305,6 +305,9 @@ def _run_trial(
         return m_data
 
     ui.print_info("recorded weights:")
+
+    clear_accuracy_function = False
+    trailing_air_gap_ul = 0.0 if trial.multi_dispense_ul else None
 
     # RUN MIX
     if trial.mix:
@@ -320,7 +323,7 @@ def _run_trial(
             callbacks=pipetting_callbacks,
             blank=trial.blank,
             mode=trial.mode,
-            clear_accuracy_function=trial.cfg.increment,
+            clear_accuracy_function=trial.cfg.increment
         )
     else:
         # center channel over well
@@ -353,18 +356,16 @@ def _run_trial(
         callbacks=pipetting_callbacks,
         blank=trial.blank,
         mode=trial.mode,
-        clear_accuracy_function=trial.cfg.increment,
+        clear_accuracy_function=clear_accuracy_function,
         multi_dispense_backlash_ul=trial.multi_dispense_backlash_ul,
-        trailing_air_gap_ul=0.0 if trial.multi_dispense_backlash_ul else None,
+        trailing_air_gap_ul=trailing_air_gap_ul,
     )
     trial.ctx._core.get_hardware().retract(mnt)  # retract to top of gantry
 
     _take_photos(trial, "aspirate")
     m_data_aspirate = _record_measurement_and_store(MeasurementType.ASPIRATE)
     volume_aspirate = calculate_change_in_volume(m_data_init, m_data_aspirate)
-    ui.print_info(f"\tgrams after aspirate: {m_data_aspirate.grams_average} g")
-    ui.print_info(f"\tcelsius after aspirate: {m_data_aspirate.celsius_pipette} C")
-    ui.print_info(f"\tvolume after aspirate: {volume_aspirate} ul")
+    ui.print_info(f"\taspirate: {volume_aspirate} ul")
 
     # RUN DISPENSE
     if trial.multi_dispense_ul:
@@ -374,9 +375,10 @@ def _run_trial(
     m_data_dispense: List[MeasurementData] = []
     dispense_volumes: List[float] = []
     count = 0
-    while trial.pipette.current_volume > 0:
-        print(f"current pipette volume: {trial.pipette.current_volume}")
+    while True:
         count += 1
+        added_blow_out = bool(trial.pipette.current_volume <= dispense_volume + 0.001)
+        print(f"added_blow_out: {added_blow_out}")
         dispense_with_liquid_class(
             trial.ctx,
             trial.pipette,
@@ -389,23 +391,23 @@ def _run_trial(
             callbacks=pipetting_callbacks,
             blank=trial.blank,
             mode=trial.mode,
-            # clear_accuracy_function=trial.cfg.increment,
-            clear_accuracy_function=True,  # TODO: delete this
-            trailing_air_gap_ul=0.0 if trial.multi_dispense_backlash_ul else None,
-            added_blow_out=False if trial.multi_dispense_backlash_ul else None,
+            clear_accuracy_function=clear_accuracy_function,
+            trailing_air_gap_ul=trailing_air_gap_ul,
+            added_blow_out=added_blow_out,
         )
         trial.ctx._core.get_hardware().retract(mnt)  # retract to top of gantry
         _take_photos(trial, "dispense")
-        m_data_dispense.append(_record_measurement_and_store(MeasurementType.DISPENSE))
-        if len(m_data_dispense) == 1:
-            disp_vol = calculate_change_in_volume(m_data_aspirate, m_data_dispense[-1])
+        new_measurement = _record_measurement_and_store(MeasurementType.DISPENSE, extra=f"dispense-{count}")
+        if not len(m_data_dispense):
+            prev_measurement = m_data_aspirate
         else:
-            disp_vol = calculate_change_in_volume(m_data_dispense[-2], m_data_dispense[-1])
+            prev_measurement = m_data_dispense[-1]
+        disp_vol = calculate_change_in_volume(prev_measurement, new_measurement)
         dispense_volumes.append(disp_vol)
-        ui.print_info(f"\t[{count}] grams after dispense: {m_data_dispense[-1].grams_average} g")
-        ui.print_info(f"\t[{count}] celsius after aspirate: {m_data_aspirate.celsius_pipette} C")
-        ui.print_info(f"\t[{count}] volume after dispense: {dispense_volumes[-1]} ul")
-        input("ENTER to continue:")
+        ui.print_info(f"\t[{count}] dispense: {dispense_volumes[-1]} ul")
+        m_data_dispense.append(new_measurement)
+        if added_blow_out:
+            break
 
     volume_dispense_avg = sum(dispense_volumes) / len(dispense_volumes)
     return volume_aspirate, m_data_aspirate, volume_dispense_avg, m_data_dispense[-1]
