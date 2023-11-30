@@ -139,7 +139,7 @@ class RunArgs:
     protocol_cfg: Any
     test_report: report.CSVReport
     multi_dispense_backlash_ul: float
-    multi_dispense_ul: float
+    multi_dispense_ul: List[float]
 
     @classmethod
     def _get_protocol_context(cls, args: argparse.Namespace) -> ProtocolContext:
@@ -230,8 +230,9 @@ class RunArgs:
                 args.pipette,
                 tip,
                 args.user_volumes,
+                args.multi_dispense_ul,
                 kind,
-                False,  # set extra to false so we always do the normal tests first
+                False,  # set extra to false, so we always do the normal tests first
                 args.channels,
                 mode=args.mode,  # NOTE: only needed for increment test
             )
@@ -261,6 +262,7 @@ class RunArgs:
                     args.pipette,
                     tip,
                     args.user_volumes,
+                    args.multi_dispense_ul,
                     kind,
                     True,
                     args.channels,
@@ -582,7 +584,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--pre-heat", action="store_true")
     parser.add_argument("--multi-dispense-backlash-ul", type=float, default=0.0)
-    parser.add_argument("--multi-dispense-ul", type=float, default=0.0)
+    parser.add_argument("--multi-dispense-ul", nargs="+", type=float, default=[])
     args = parser.parse_args()
     run_args = RunArgs.build_run_args(args)
     if not run_args.ctx.is_simulating():

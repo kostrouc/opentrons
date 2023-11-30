@@ -371,16 +371,18 @@ def _run_trial(
 
     # RUN DISPENSE
     if trial.multi_dispense_ul:
-        dispense_volume = trial.multi_dispense_ul
+        dispense_volumes = trial.multi_dispense_ul
     else:
-        dispense_volume = trial.volume
+        dispense_volumes = [trial.volume]
     m_data_dispense: List[MeasurementData] = []
-    dispense_volumes: List[float] = []
+    measured_disp_volumes: List[float] = []
     count = 0
-    while True:
+    for dispense_volume in dispense_volumes:
         count += 1
         added_blow_out = bool(trial.pipette.current_volume <= dispense_volume + 0.001)
         print(f"added_blow_out: {added_blow_out}")
+        if added_blow_out:
+            assert count == len(dispense_volumes)
         dispense_with_liquid_class(
             trial.ctx,
             trial.pipette,
@@ -405,13 +407,11 @@ def _run_trial(
         else:
             prev_measurement = m_data_dispense[-1]
         disp_vol = calculate_change_in_volume(prev_measurement, new_measurement)
-        dispense_volumes.append(disp_vol)
-        ui.print_info(f"\t[{count}] dispense: {dispense_volumes[-1]} ul")
+        measured_disp_volumes.append(disp_vol)
+        ui.print_info(f"\t[{count}] dispense: {measured_disp_volumes[-1]} ul")
         m_data_dispense.append(new_measurement)
-        if added_blow_out:
-            break
 
-    volume_dispense_avg = sum(dispense_volumes) / len(dispense_volumes)
+    volume_dispense_avg = sum(measured_disp_volumes) / len(measured_disp_volumes)
     return volume_aspirate, m_data_aspirate, volume_dispense_avg, m_data_dispense[-1]
 
 

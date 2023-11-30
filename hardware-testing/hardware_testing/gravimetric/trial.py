@@ -27,7 +27,7 @@ class VolumetricTrial:
     tip_volume: int
     volume: float
     multi_dispense_backlash_ul: float
-    multi_dispense_ul: float
+    multi_dispense_ul: List[float]
     mix: bool
     acceptable_cv: Optional[float]
     acceptable_d: Optional[float]
@@ -92,7 +92,7 @@ def build_gravimetric_trials(
     blank: bool,
     env_sensor: asair_sensor.AsairSensorBase,
     multi_dispense_backlash_ul: float = 0.0,
-    multi_dispense_ul: float = 0.0,
+    multi_dispense_ul: List[float] = [],
 ) -> Dict[float, Dict[int, List[GravimetricTrial]]]:
     """Build a list of all the trials that will be run."""
     trial_list: Dict[float, Dict[int, List[GravimetricTrial]]] = {}
@@ -152,12 +152,14 @@ def build_gravimetric_trials(
                 for trial in range(cfg.trials):
                     d: Optional[float] = None
                     cv: Optional[float] = None
-                    if not cfg.increment and not cfg.user_volumes:
+                    try:
                         d, cv = config.QC_TEST_MIN_REQUIREMENTS[cfg.pipette_channels][
                             cfg.pipette_volume
                         ][cfg.tip_volume][volume]
                         d = d * (1 - config.QC_TEST_SAFETY_FACTOR)
                         cv = cv * (1 - config.QC_TEST_SAFETY_FACTOR)
+                    except Exception:
+                        pass
                     trial_list[volume][channel].append(
                         GravimetricTrial(
                             ctx=ctx,

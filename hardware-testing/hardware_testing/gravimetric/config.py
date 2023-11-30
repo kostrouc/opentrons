@@ -37,7 +37,7 @@ class VolumetricConfig:
     ignore_fail: bool
     mode: str
     multi_dispense_backlash_ul: float
-    multi_dispense_ul: float
+    multi_dispense_ul: List[float]
 
 
 @dataclass

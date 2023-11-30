@@ -312,6 +312,7 @@ def _get_volumes(
     pipette_volume: int,
     tip_volume: int,
     user_volumes: bool,
+    multi_dispense_ul: List[float],
     kind: config.ConfigType,
     extra: bool,
     channels: int,
@@ -331,6 +332,10 @@ def _get_volumes(
             )
         test_volumes = [
             float(vol_str) for vol_str in _inp.strip().split(",") if vol_str
+        ]
+    elif multi_dispense_ul:
+        test_volumes = [
+            sum(multi_dispense_ul)
         ]
     else:
         test_volumes = get_test_volumes(
