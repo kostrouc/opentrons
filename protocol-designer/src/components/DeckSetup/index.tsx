@@ -12,9 +12,10 @@ import {
   SingleSlotFixture,
   StagingAreaFixture,
   StagingAreaLocation,
-  TrashLocation,
+  TrashCutoutId,
   useOnClickOutside,
   WasteChuteFixture,
+  WasteChuteStagingAreaFixture,
 } from '@opentrons/components'
 import {
   AdditionalEquipmentEntity,
@@ -33,13 +34,11 @@ import {
   inferModuleOrientationFromXCoordinate,
   isAddressableAreaStandardSlot,
   OT2_ROBOT_TYPE,
-  STAGING_AREA_LOAD_NAME,
+  STAGING_AREA_CUTOUTS,
   THERMOCYCLER_MODULE_TYPE,
-  TRASH_BIN_LOAD_NAME,
+  TRASH_BIN_ADAPTER_FIXTURE,
   WASTE_CHUTE_CUTOUT,
-  WASTE_CHUTE_LOAD_NAME,
 } from '@opentrons/shared-data'
-import { FLEX_TRASH_DEF_URI, OT_2_TRASH_DEF_URI } from '../../constants'
 import { selectors as labwareDefSelectors } from '../../labware-defs'
 
 import { selectors as featureFlagSelectors } from '../../feature-flags'
@@ -503,12 +502,11 @@ export const DeckSetup = (): JSX.Element => {
   const _disableCollisionWarnings = useSelector(
     featureFlagSelectors.getDisableModuleRestrictions
   )
-  const trash = Object.values(activeDeckSetup.labware).find(
-    lw =>
-      lw.labwareDefURI === OT_2_TRASH_DEF_URI ||
-      lw.labwareDefURI === FLEX_TRASH_DEF_URI
+  const trash = Object.values(activeDeckSetup.additionalEquipmentOnDeck).find(
+    ae => ae.name === 'trashBin'
   )
-  const trashSlot = trash?.slot
+
+  const trashSlot = trash?.location
   const robotType = useSelector(getRobotType)
   const dispatch = useDispatch()
 
@@ -525,26 +523,38 @@ export const DeckSetup = (): JSX.Element => {
       if (drilledDown) dispatch(labwareIngredActions.drillUpFromLabware())
     },
   })
-
   const trashBinFixtures = [
     {
-      fixtureId: trash?.id,
-      fixtureLocation:
-        trash?.slot != null
-          ? getCutoutIdForAddressableArea(
-              trash?.slot as AddressableAreaName,
-              deckDef.cutoutFixtures
-            )
-          : null,
-      loadName: TRASH_BIN_LOAD_NAME,
+      cutoutId: trash?.location as CutoutId,
+      cutoutFixtureId: TRASH_BIN_ADAPTER_FIXTURE,
     },
   ]
   const wasteChuteFixtures = Object.values(
     activeDeckSetup.additionalEquipmentOnDeck
-  ).filter(aE => aE.name === WASTE_CHUTE_LOAD_NAME)
+  ).filter(
+    aE =>
+      WASTE_CHUTE_CUTOUT.includes(aE.location as CutoutId) &&
+      aE.name === 'wasteChute'
+  )
   const stagingAreaFixtures: AdditionalEquipmentEntity[] = Object.values(
     activeDeckSetup.additionalEquipmentOnDeck
-  ).filter(aE => aE.name === STAGING_AREA_LOAD_NAME)
+  ).filter(
+    aE =>
+      STAGING_AREA_CUTOUTS.includes(aE.location as CutoutId) &&
+      aE.name === 'stagingArea'
+  )
+
+  const wasteChuteStagingAreaFixtures = Object.values(
+    activeDeckSetup.additionalEquipmentOnDeck
+  ).filter(
+    aE =>
+      STAGING_AREA_CUTOUTS.includes(aE.location as CutoutId) &&
+      aE.name === 'stagingArea' &&
+      aE.location === WASTE_CHUTE_CUTOUT
+  )
+
+  const hasWasteChute =
+    wasteChuteFixtures.length > 0 || wasteChuteStagingAreaFixtures.length > 0
 
   const filteredAddressableAreas = deckDef.locations.addressableAreas.filter(
     aa => isAddressableAreaStandardSlot(aa.id, deckDef)
@@ -556,7 +566,11 @@ export const DeckSetup = (): JSX.Element => {
         <RobotCoordinateSpaceWithDOMCoords
           height="100%"
           deckDef={deckDef}
-          viewBox={`${deckDef.cornerOffsetFromOrigin[0]} ${deckDef.cornerOffsetFromOrigin[1]} ${deckDef.dimensions[0]} ${deckDef.dimensions[1]}`}
+          viewBox={`${deckDef.cornerOffsetFromOrigin[0]} ${
+            hasWasteChute
+              ? deckDef.cornerOffsetFromOrigin[1] - 30
+              : deckDef.cornerOffsetFromOrigin[1]
+          } ${deckDef.dimensions[0]} ${deckDef.dimensions[1]}`}
         >
           {({ getRobotCoordsFromDOMCoords }) => (
             <>
@@ -593,11 +607,11 @@ export const DeckSetup = (): JSX.Element => {
                     />
                   ))}
                   {trash != null
-                    ? trashBinFixtures.map(fixture =>
-                        fixture.fixtureLocation != null ? (
-                          <React.Fragment key={fixture.fixtureId}>
+                    ? trashBinFixtures.map(({ cutoutId }) =>
+                        cutoutId != null ? (
+                          <React.Fragment key={cutoutId}>
                             <SingleSlotFixture
-                              cutoutId={fixture.fixtureLocation}
+                              cutoutId={cutoutId}
                               deckDefinition={deckDef}
                               slotClipColor={COLORS.transparent}
                               fixtureBaseColor={lightFill}
@@ -605,9 +619,7 @@ export const DeckSetup = (): JSX.Element => {
                             <FlexTrash
                               robotType={robotType}
                               trashIconColor={lightFill}
-                              trashLocation={
-                                fixture.fixtureLocation as TrashLocation
-                              }
+                              trashCutoutId={cutoutId as TrashCutoutId}
                               backgroundColor={darkFill}
                             />
                           </React.Fragment>
@@ -616,6 +628,15 @@ export const DeckSetup = (): JSX.Element => {
                     : null}
                   {wasteChuteFixtures.map(fixture => (
                     <WasteChuteFixture
+                      key={fixture.id}
+                      cutoutId={fixture.location as typeof WASTE_CHUTE_CUTOUT}
+                      deckDefinition={deckDef}
+                      slotClipColor={darkFill}
+                      fixtureBaseColor={lightFill}
+                    />
+                  ))}
+                  {wasteChuteStagingAreaFixtures.map(fixture => (
+                    <WasteChuteStagingAreaFixture
                       key={fixture.id}
                       cutoutId={fixture.location as typeof WASTE_CHUTE_CUTOUT}
                       deckDefinition={deckDef}
@@ -644,6 +665,7 @@ export const DeckSetup = (): JSX.Element => {
               <SlotLabels
                 robotType={robotType}
                 hasStagingAreas={stagingAreaFixtures.length > 0}
+                hasWasteChute={hasWasteChute}
               />
             </>
           )}
