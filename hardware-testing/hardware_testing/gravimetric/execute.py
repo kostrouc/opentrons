@@ -308,7 +308,10 @@ def _run_trial(
 
     ui.print_info("recorded weights:")
 
-    clear_accuracy_function = False
+    if trial.multi_dispense_ul or trial.cfg.increment:
+        clear_accuracy_function = True
+    else:
+        clear_accuracy_function = False
     trailing_air_gap_ul = 0.0 if trial.multi_dispense_ul else None
 
     # RUN MIX
@@ -325,7 +328,7 @@ def _run_trial(
             callbacks=pipetting_callbacks,
             blank=trial.blank,
             mode=trial.mode,
-            clear_accuracy_function=trial.cfg.increment
+            clear_accuracy_function=clear_accuracy_function
         )
     else:
         # center channel over well
@@ -378,6 +381,7 @@ def _run_trial(
     measured_disp_volumes: List[float] = []
     count = 0
     for dispense_volume in dispense_volumes:
+        print(f"dispensing: {dispense_volume} ul")
         count += 1
         added_blow_out = bool(trial.pipette.current_volume <= dispense_volume + 0.001)
         print(f"added_blow_out: {added_blow_out}")

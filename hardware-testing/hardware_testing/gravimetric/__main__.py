@@ -463,6 +463,8 @@ def build_photometric_cfg(
         photoplate_column_offset=photoplate_column_offset,
         dye_well_column_offset=dye_well_column_offset,
         mode=mode,
+        multi_dispense_backlash_ul=run_args.multi_dispense_backlash_ul,
+        multi_dispense_ul=run_args.multi_dispense_ul,
     )
 
 
