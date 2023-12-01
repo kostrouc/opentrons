@@ -308,7 +308,7 @@ def _run_trial(
 
     ui.print_info("recorded weights:")
 
-    if trial.multi_dispense_ul or trial.cfg.increment:
+    if trial.cfg.increment:
         clear_accuracy_function = True
     else:
         clear_accuracy_function = False

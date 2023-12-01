@@ -305,7 +305,7 @@ class GravimetricRecorder:
         Popen(f"nohup {SERVER_CMD} --test-name {self._cfg.test_name} &", shell=True)
         if not self.is_simulator:
             sleep(2)  # small delay so nohup output isn't confusing
-            ui.get_user_ready("open WEBPAGE to port 8080")
+        #     ui.get_user_ready("open WEBPAGE to port 8080")
 
     @property
     def tag(self) -> str:
