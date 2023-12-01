@@ -121,9 +121,19 @@ def get_unused_tips(ctx: ProtocolContext, tip_volume: int) -> List[Well]:
     return _unused_tips_for_racks(racks)
 
 
-def get_tips_for_single(ctx: ProtocolContext, tip_volume: int) -> List[Well]:
+def get_tips_for_single(ctx: ProtocolContext, tip_volume: int, starting_tip: str = "") -> List[Well]:
     """Get tips for single channel."""
-    return get_unused_tips(ctx, tip_volume)
+    if not starting_tip:
+        return get_unused_tips(ctx, tip_volume)
+    else:
+        _ret: List[Well] = []
+        _found = False
+        for tip in get_unused_tips(ctx, tip_volume):
+            if not _found and starting_tip in tip.well_name:
+                _found = True
+            if _found:
+                _ret.append(tip)
+        return _ret
 
 
 def get_tips_for_individual_channel_on_multi(
@@ -168,10 +178,11 @@ def get_tips(
     pipette: InstrumentContext,
     tip_volume: int,
     all_channels: bool = True,
+    starting_tip: str = "",
 ) -> Dict[int, List[Well]]:
     """Get tips."""
     if pipette.channels == 1:
-        return {0: get_tips_for_single(ctx, tip_volume)}
+        return {0: get_tips_for_single(ctx, tip_volume, starting_tip=starting_tip)}
     elif pipette.channels == 8:
         if all_channels:
             return {0: get_tips_for_all_channels_on_multi(ctx, tip_volume)}

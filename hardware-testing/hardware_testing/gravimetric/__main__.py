@@ -538,6 +538,7 @@ def _main(
             run_args.pipette,
             tip,
             all_channels=all_channels_same_time,
+            starting_tip=args.starting_tip
         ),
         env_sensor=run_args.environment_sensor,
         recorder=run_args.recorder,
@@ -582,6 +583,10 @@ if __name__ == "__main__":
     parser.add_argument("--pre-heat", action="store_true")
     parser.add_argument("--multi-dispense-backlash-ul", type=float, default=0.0)
     parser.add_argument("--multi-dispense-ul", nargs="+", type=float, default=[])
+    tip_choices = [f"{r}{c + 1}" for r in "ABCDEFGH" for c in range(12)]
+    parser.add_argument(
+        "--starting-tip", type=str, choices=[""] + tip_choices, default=""
+    )
     args = parser.parse_args()
     run_args = RunArgs.build_run_args(args)
     if not run_args.ctx.is_simulating():
