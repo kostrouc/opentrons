@@ -12,15 +12,28 @@ from hardware_testing.opentrons_api import helpers_ot3
 async def _exercise_pipette(api: OT3API, mount: types.OT3Mount) -> None:
     while True:
         msg = (
-            '"t"=tip pickup/drop, "a"=aspirate, '
-            '"d"=dispense, "b"=blow-out, "j"=jog: '
+            '"t"=tip pickup/drop, "p"=prepare-for-aspirate, "f"=flow-rate, ',
+            '"a"=aspirate, "d"=dispense, "b"=blow-out, ',
+            '"j"=jog:'
         )
         _inp = input(msg).strip()
         try:
             _value = float(_inp[1:])
         except ValueError:
             _value = None  # type: ignore[assignment]
-        if _inp[0] == "a":
+        if _inp[0] == "t":
+            pipette = api.hardware_pipettes[mount.to_mount()]
+            assert pipette is not None
+            if pipette.has_tip:
+                await api.drop_tip(mount)
+            elif _value:
+                tip_length = helpers_ot3.get_default_tip_length(int(_value))
+                await api.pick_up_tip(mount, tip_length)
+        elif _inp[0] == "p":
+            await api.prepare_for_aspirate(mount)
+        elif _inp[0] == "f":
+            api.set_flow_rate(mount, aspirate=_value, dispense=_value, blow_out=_value)
+        elif _inp[0] == "a":
             try:
                 await api.prepare_for_aspirate(mount)
             except Exception as e:
@@ -30,14 +43,6 @@ async def _exercise_pipette(api: OT3API, mount: types.OT3Mount) -> None:
             await api.dispense(mount, _value)
         elif _inp[0] == "b":
             await api.blow_out(mount, _value)
-        elif _inp[0] == "t":
-            pipette = api.hardware_pipettes[mount.to_mount()]
-            assert pipette is not None
-            if pipette.has_tip:
-                await api.drop_tip(mount)
-            elif _value:
-                tip_length = helpers_ot3.get_default_tip_length(int(_value))
-                await api.pick_up_tip(mount, tip_length)
         elif _inp[0] == "j":
             return
         else:
