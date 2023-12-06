@@ -3,6 +3,7 @@ import argparse
 import asyncio
 from typing import Optional
 
+from opentrons_shared_data.errors.exceptions import PipetteOverpressureError
 from opentrons.hardware_control.ot3api import OT3API
 
 from hardware_testing.opentrons_api import types
@@ -70,13 +71,21 @@ async def _main(
     is_simulating: bool, mount: types.OT3Mount, speed: Optional[float]
 ) -> None:
     api = await helpers_ot3.build_async_ot3_hardware_api(is_simulating=is_simulating)
-    await api.home()
+    await api.home([types.Axis.X, types.Axis.Y, types.Axis.Z_L, types.Axis.Z_R])
+    if api.hardware_pipettes[mount.to_mount()]:
+        try:
+            await api.home([types.Axis.of_main_tool_actuator(mount.to_mount())])
+        except PipetteOverpressureError as e:
+            print(e)
     while True:
         await helpers_ot3.jog_mount_ot3(api, mount, speed=speed)
         if mount == types.OT3Mount.GRIPPER:
             await _exercise_gripper(api)
         else:
-            await _exercise_pipette(api, mount)
+            try:
+                await _exercise_pipette(api, mount)
+            except PipetteOverpressureError as e:
+                print(e)
 
 
 if __name__ == "__main__":
