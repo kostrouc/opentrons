@@ -1,6 +1,9 @@
 """Pressure-Check OT3."""
 import argparse
 import asyncio
+from time import time
+
+from opentrons_hardware.firmware_bindings.constants import SensorId
 
 from opentrons_shared_data.errors.exceptions import PipetteOverpressureError
 
@@ -42,8 +45,29 @@ async def _main(is_simulating: bool, submerge: float) -> None:
         SLOT_RESERVOIR, f"nest_1_reservoir_195ml"
     )
 
+    def _flow_rate(_fr: float) -> None:
+        api.set_flow_rate(mount, aspirate=_fr, dispense=_fr, blow_out=_fr)
+
+    async def _wait_for_stable_pressure() -> None:
+        sensor_ids = [SensorId.S0]
+        if channels > 0:
+            sensor_ids.append(SensorId.S1)
+        pressure_data = {
+            sensor_id: []
+            for sensor_id in sensor_ids
+        }
+        inspect_seconds = 30
+        start_time = time()
+        while time() - start_time < inspect_seconds:
+            for sensor_id in sensor_ids:
+                pa = await helpers_ot3.get_pressure_ot3(api, mount, sensor_id)
+                pressure_data[sensor_id].append(pa)
+            print(
+                f"{''.join([str(d[-1]) for d in pressure_data.keys()])}"
+            )
+
     def _tip_rack(name: str) -> Point:
-        x = 9 * int(name[1:])
+        x = 9 * (int(name[1:]) - 1)
         y = -9 * "ABCDEFGH".index(name[0])
         return tip_rack_a1 + Point(x=x, y=y, z=0)
 
@@ -100,11 +124,10 @@ async def _main(is_simulating: bool, submerge: float) -> None:
         await _pick_up_tip("A1", tip=int(tip_volume))
         await _move_to_meniscus()
         await api.move_rel(mount, Point(z=-abs(submerge)))
-        flow_rate = _input_number(f"ENTER flow-rate: ")
-        volume = _input_number(f"ENTER aspirate volume: ")
-        api.set_flow_rate(mount, aspirate=flow_rate, dispense=flow_rate, blow_out=flow_rate)
+        _flow_rate(_input_number(f"ENTER flow-rate: "))
         try:
-            await api.aspirate(mount, volume=volume)
+            await api.aspirate(mount, volume=_input_number(f"ENTER aspirate volume: "))
+            await _wait_for_stable_pressure()
             _input("Dispense: ")
             await api.blow_out(mount)
             _input("Retract: ")
@@ -114,8 +137,17 @@ async def _main(is_simulating: bool, submerge: float) -> None:
         except PipetteOverpressureError as e:
             print(e)
             _input("Retract: ")
-            await api.retract()
-            _input("REMOVE tip(s) by hand, press ENTER when done: ")
+            await api.retract(mount)
+            print("attempting drop-tip at slow-ish speed")
+            _flow_rate(tip_volume * 0.1)
+            while True:
+                try:
+                    _input("Drop-tip:")
+                    await api.drop_tip(mount)
+                    break
+                except PipetteOverpressureError as e:
+                    print(e)
+                    print("\ntry again (or just pull the tip off...)")
             print("homing plunger, then resuming test")
             await api.home_plunger(mount)
         if api.is_simulator:
