@@ -13,7 +13,7 @@ from hardware_testing.opentrons_api import types
 from hardware_testing.opentrons_api.types import Point
 from hardware_testing.opentrons_api import helpers_ot3
 
-SLOT_TIP_RACK = 6
+SLOTS_TIP_RACK = [2, 5, 6, 7, 8, 9, 10, 11]
 SLOT_RESERVOIR = 3
 SLOT_TRASH = 12
 
@@ -164,17 +164,24 @@ async def _main(is_simulating: bool, tip: int, submerge: float, offset_tip_rack:
     print_timestamp = 0.0
 
     # LABWARE
-    tip_rack_a1 = helpers_ot3.get_theoretical_a1_position(
-        SLOT_TIP_RACK, f"opentrons_flex_96_tiprack_50ul"  # all volumes are same size
-    )
     trash_nominal = helpers_ot3.get_slot_calibration_square_position_ot3(
         SLOT_TRASH
     ) + Point(z=TRASH_HEIGHT_MM)
     reservoir_a1 = helpers_ot3.get_theoretical_a1_position(
         SLOT_RESERVOIR, f"nest_1_reservoir_195ml"
     )
-    _available_tips = [
-        f"{row}{col}"
+
+    def _tip_position(slot: int, well: str) -> Point:
+        _rack_a1 = helpers_ot3.get_theoretical_a1_position(
+            slot, f"opentrons_flex_96_tiprack_50ul"  # all volumes are same size
+        )
+        x = 9 * (int(well[1:]) - 1)
+        y = -9 * "ABCDEFGH".index(well[0])
+        return _rack_a1 + Point(x=x, y=y, z=0)
+
+    _available_tips: List[Point] = [
+        _tip_position(slot, f"{row}{col}")
+        for slot in SLOTS_TIP_RACK
         for col in range(1, 13)
         for row in "ABCDEFGH"
     ]
@@ -235,17 +242,12 @@ async def _main(is_simulating: bool, tip: int, submerge: float, offset_tip_rack:
                 return
         print(f"unable to stabilize after {timeout} seconds")
 
-    def _tip_rack(name: str) -> Point:
-        x = 9 * (int(name[1:]) - 1)
-        y = -9 * "ABCDEFGH".index(name[0])
-        return tip_rack_a1 + Point(x=x, y=y, z=0)
-
     async def _pick_up_tip(tip_vol: int) -> None:
         nonlocal _available_tips
         assert len(_available_tips), "ran out of tip"
         await api.retract(mount)
         tip_length = helpers_ot3.get_default_tip_length(tip_vol)
-        tip_pos = _tip_rack(_available_tips[0])
+        tip_pos = _available_tips[0]
         await helpers_ot3.move_to_arched_ot3(
             api, mount, tip_pos + offset_tip_rack
         )
@@ -332,9 +334,11 @@ async def _main(is_simulating: bool, tip: int, submerge: float, offset_tip_rack:
             blow_out=settings.flow_rate_dispense
         )
         try:
+            print(f"aspirating {settings.volume} uL at {settings.flow_rate_aspirate} ul/sec")
             await api.aspirate(mount, volume=settings.volume)
             await _wait_for_stable_pressure(action="aspirate", settings=settings)
             await api.move_rel(mount, Point(z=abs(well_top_to_meniscus_mm)))
+            print(f"dispensing {settings.volume} uL at {settings.flow_rate_dispense} ul/sec")
             await api.blow_out(mount)
             await _wait_for_stable_pressure(action="dispense", settings=settings)
             await api.retract(mount)
@@ -367,7 +371,6 @@ async def _main(is_simulating: bool, tip: int, submerge: float, offset_tip_rack:
     print("\n\nLabware Locations:")
     print(f"Trash: {SLOT_TRASH}")
     print(f"12-Well Reservoir: {SLOT_RESERVOIR}")
-    print(f"Tip-Rack: {SLOT_TIP_RACK}")
     await api.home([ax for ax in types.Axis.gantry_axes()])
     await _reset_pipette()
     flow_rates_aspirate = TEST_FLOW_RATE_ASPIRATE[channels][pip_volume][tip]
