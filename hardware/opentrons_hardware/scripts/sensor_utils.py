@@ -4,7 +4,7 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Tuple
 import csv
 from opentrons_hardware.sensors.types import SensorDataType, EnvironmentSensorDataType
 
@@ -101,13 +101,27 @@ async def handle_pressure_sensor(
     end_time = start_time + timedelta(minutes=command.minutes)
     messenger = CanMessenger(driver=driver)
     messenger.start()
+    prev_1_second: List[Tuple[datetime, float]] = []
+    stable = False
+    stable_seconds = 1.0
+    stable_pascals = 5.0
     while datetime.now() < end_time:
         data = await s_driver.read(messenger, pressure, offset=False, timeout=10)
-        curr_time = datetime.now().strftime(hms)
+        curr_time = datetime.now()
+        # check for stability
+        prev_1_second.append((curr_time, data.to_float(),))
+        while prev_1_second[0][0] < curr_time - timedelta(seconds=stable_seconds):
+            prev_1_second.pop(0)
+            pascals = [d[1] for d in prev_1_second]
+            stable = bool(max(pascals) - min(pascals) <= stable_pascals)
         if isinstance(data, SensorDataType):
             log.info(f"Pressure data: {data.to_float()} at: {curr_time}")
             if csv:
-                csv.write_dict({"time": curr_time, "data": data.to_float()})
+                csv.write_dict({
+                    "time": curr_time.strftime(hms),
+                    "data": data.to_float(),
+                    "stable": int(stable)
+                })
         else:
             log.info(f"Pressure data not found at: {curr_time}")
         await sleep(0.025)  # easing up on CAN bus, so other script can run too

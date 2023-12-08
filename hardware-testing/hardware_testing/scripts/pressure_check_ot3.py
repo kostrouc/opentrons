@@ -1,11 +1,11 @@
 """Pressure-Check OT3."""
 import argparse
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 from dataclasses import dataclass
 from pathlib import Path
 from time import time
-from typing import List, Tuple, Any
+from typing import List, Tuple, Any, Optional
 
 from opentrons_hardware.firmware_bindings.constants import SensorId
 from opentrons_hardware.scripts.sensor_utils import hms
@@ -284,7 +284,38 @@ def _input_number(api: OT3API, msg: str) -> float:
         return _input_number(api, msg)
 
 
-async def _run_and_get_pressure(coro: Any, file: Path, simulate: bool) -> List[Tuple[datetime, float]]:
+@dataclass
+class PressureSegment:
+    samples: List[Tuple[datetime, float, bool]]
+    duration: float
+    average: float
+    min: float
+    max: float
+    stabilize_seconds: Optional[float]
+
+    @classmethod
+    def build(cls, data_lines: List[Tuple[datetime, float, bool]]) -> "PressureSegment":
+        data_lines.sort(key=lambda _d: _d[0])
+        times = [line[0] for line in data_lines]
+        pascals = [line[1] for line in data_lines]
+        stable_sec: Optional[float] = None
+        for d in data_lines:
+            if d[2]:
+                stable_sec = (d[0] - data_lines[0][0]).total_seconds()
+                break
+        return PressureSegment(
+            samples=data_lines,
+            duration=(max(times) - min(times)).total_seconds(),
+            average=sum(pascals) / len(pascals),
+            min=min(pascals),
+            max=max(pascals),
+            stabilize_seconds=stable_sec,
+        )
+
+
+async def _run_and_get_pressure(
+    coro: Any, file: Path, simulate: bool
+) -> PressureSegment:
     if simulate:
         start = datetime.strptime("12:34:56.0", hms)
     else:
@@ -294,7 +325,28 @@ async def _run_and_get_pressure(coro: Any, file: Path, simulate: bool) -> List[T
         end = datetime.strptime("12:34:58.0", hms)
     else:
         end = datetime.now()
-    return _read_lines(file, start, end)
+    with open(file, "r") as f:
+        lines = f.readlines()
+    found_lines: List[Tuple[datetime, float, bool]] = []
+    for line in lines:
+        elements = [el.strip() for el in line.strip().split(",") if el]
+        try:
+            assert len(elements) == 3
+            dtime = datetime.strptime(elements[0], hms)
+            if start <= dtime <= end:
+                pressure = float(elements[1])
+                stable = bool(int(elements[2]))
+                found_lines.append(
+                    (
+                        dtime,
+                        pressure,
+                        stable,
+                    )
+                )
+        except Exception as e:
+            print(e)
+            continue
+    return PressureSegment.build(found_lines)
 
 
 async def _delay(seconds: int, simulate: bool) -> None:
@@ -304,7 +356,9 @@ async def _delay(seconds: int, simulate: bool) -> None:
         await asyncio.sleep(0.01 if simulate else 1.0)
 
 
-async def _run_trial(api: OT3API, trial: TrialSettings, pressure_file: Path) -> List[List[Tuple[datetime, float]]]:
+async def _run_trial(
+    api: OT3API, trial: TrialSettings, pressure_file: Path
+) -> List[PressureSegment]:
     print("\n\n\n\n----------")
     await _pick_up_tip(api, trial.pipette, int(trial.pipette.tip))
     await _move_to_meniscus(api, trial.pipette)
@@ -326,28 +380,22 @@ async def _run_trial(api: OT3API, trial: TrialSettings, pressure_file: Path) -> 
         press_asp = await _run_and_get_pressure(
             api.aspirate(trial.pipette.mount, volume=trial.aspirate_volume),
             pressure_file,
-            api.is_simulator
+            api.is_simulator,
         )
         print("delaying after aspirate...")
         press_asp_del = await _run_and_get_pressure(
-            _delay(60 * 2, api.is_simulator),
-            pressure_file,
-            api.is_simulator
+            _delay(60 * 2, api.is_simulator), pressure_file, api.is_simulator
         )
         await api.move_rel(trial.pipette.mount, Point(z=abs(well_top_to_meniscus_mm)))
         print(
             f"dispensing {trial.aspirate_volume} uL at {trial.flow_rate_dispense} ul/sec"
         )
         press_disp = await _run_and_get_pressure(
-            api.blow_out(trial.pipette.mount),
-            pressure_file,
-            api.is_simulator
+            api.blow_out(trial.pipette.mount), pressure_file, api.is_simulator
         )
         print("delaying after dispensing...")
         press_disp_del = await _run_and_get_pressure(
-            _delay(60 * 2, api.is_simulator),
-            pressure_file,
-            api.is_simulator
+            _delay(60 * 2, api.is_simulator), pressure_file, api.is_simulator
         )
         await api.retract(trial.pipette.mount)
         await _drop_tip(api, trial.pipette)
@@ -355,7 +403,7 @@ async def _run_trial(api: OT3API, trial: TrialSettings, pressure_file: Path) -> 
         print(e)
         await api.home(list(types.Axis.gantry_axes()))
         await _drop_tip(api, trial.pipette, after_fail=True)
-    return [press_asp, press_asp_del, press_disp ,press_disp_del]
+    return [press_asp, press_asp_del, press_disp, press_disp_del]
 
 
 async def _reset_hardware(api: OT3API, pipette: PipetteSettings) -> None:
@@ -381,25 +429,6 @@ def _build_default_trial(pipette: PipetteSettings) -> TrialSettings:
             pipette.tip
         ],
     )
-
-
-def _read_lines(file: Path, start: datetime, end: datetime) -> List[Tuple[datetime, float]]:
-    with open(file, "r") as f:
-        lines = f.readlines()
-    ret: List[Tuple[datetime, float]] = []
-    for line in lines:
-        elements = [el.strip() for el in line.strip().split(",") if el]
-        try:
-            assert len(elements) == 2
-            dtime = datetime.strptime(elements[0], hms)
-            pressure = float(elements[1])
-            if start <= dtime <= end:
-                ret.append((dtime, pressure,))
-        except Exception as e:
-            print(e)
-            continue
-    print(ret)
-    return ret
 
 
 async def _run_test(
