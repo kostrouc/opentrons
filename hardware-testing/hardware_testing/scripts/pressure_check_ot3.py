@@ -1,11 +1,14 @@
 """Pressure-Check OT3."""
 import argparse
 import asyncio
+from datetime import datetime
 from dataclasses import dataclass
+from pathlib import Path
 from time import time
-from typing import List
+from typing import List, Tuple, Any
 
 from opentrons_hardware.firmware_bindings.constants import SensorId
+from opentrons_hardware.scripts.sensor_utils import hms
 
 from opentrons_shared_data.errors.exceptions import PipetteOverpressureError
 
@@ -281,7 +284,14 @@ def _input_number(api: OT3API, msg: str) -> float:
         return _input_number(api, msg)
 
 
-async def _run_trial(api: OT3API, trial: TrialSettings) -> None:
+async def _run_and_get_pressure(coro: Any, file: Path) -> List[Tuple[datetime, float]]:
+    start = datetime.now()
+    await coro
+    end = datetime.now()
+    return _read_lines(file, start, end)
+
+
+async def _run_trial(api: OT3API, trial: TrialSettings, pressure_file: Path) -> List[List[Tuple[datetime, float]]]:
     print("\n\n\n\n----------")
     await _pick_up_tip(api, trial.pipette, int(trial.pipette.tip))
     await _move_to_meniscus(api, trial.pipette)
@@ -292,22 +302,43 @@ async def _run_trial(api: OT3API, trial: TrialSettings) -> None:
         dispense=trial.flow_rate_dispense,
         blow_out=trial.flow_rate_dispense,
     )
+    press_asp = []
+    press_asp_del = []
+    press_disp = []
+    press_disp_del = []
     try:
         print(
             f"aspirating {trial.aspirate_volume} uL at {trial.flow_rate_aspirate} ul/sec"
         )
-        await api.aspirate(trial.pipette.mount, volume=trial.aspirate_volume),
+        press_asp = await _run_and_get_pressure(
+            api.aspirate(trial.pipette.mount, volume=trial.aspirate_volume),
+            pressure_file
+        )
+        print("delaying after aspirate...")
+        press_asp_del = await _run_and_get_pressure(
+            asyncio.sleep(60 * 2),
+            pressure_file
+        )
         await api.move_rel(trial.pipette.mount, Point(z=abs(well_top_to_meniscus_mm)))
         print(
             f"dispensing {trial.aspirate_volume} uL at {trial.flow_rate_dispense} ul/sec"
         )
-        await api.blow_out(trial.pipette.mount)
+        press_disp = await _run_and_get_pressure(
+            api.blow_out(trial.pipette.mount),
+            pressure_file
+        )
+        print("delaying after dispensing...")
+        press_disp_del = await _run_and_get_pressure(
+            asyncio.sleep(60 * 2),
+            pressure_file
+        )
         await api.retract(trial.pipette.mount)
         await _drop_tip(api, trial.pipette)
     except PipetteOverpressureError as e:
         print(e)
         await api.home(list(types.Axis.gantry_axes()))
         await _drop_tip(api, trial.pipette, after_fail=True)
+    return [press_asp, press_asp_del, press_disp ,press_disp_del]
 
 
 async def _reset_hardware(api: OT3API, pipette: PipetteSettings) -> None:
@@ -335,8 +366,25 @@ def _build_default_trial(pipette: PipetteSettings) -> TrialSettings:
     )
 
 
+def _read_lines(file: Path, start: datetime, end: datetime) -> List[Tuple[datetime, float]]:
+    ret: List[Tuple[datetime, float]] = []
+    with open(file, "r") as f:
+        lines = f.readlines()
+    for line in lines:
+        elements = [el for el in line.strip().split(",") if el]
+        try:
+            assert len(elements) == 2
+            dtime = datetime.strptime(elements[0], hms)
+            pressure = float(elements[1])
+            if start <= dtime <= end:
+                ret.append((dtime, pressure,))
+        except Exception:
+            continue
+    return ret
+
+
 async def _run_test(
-    api: OT3API, pipette: PipetteSettings, file: test_data.File
+    api: OT3API, pipette: PipetteSettings, file: test_data.File, pressure_file: Path
 ) -> None:
     file.append("header,here")
     aspirate_volumes = TEST_ASPIRATE_VOLUME[pipette.channels][pipette.volume][
@@ -360,17 +408,20 @@ async def _run_test(
         for volume in aspirate_volumes:
             trial.flow_rate_aspirate = flow_rate
             trial.aspirate_volume = volume
-            await _run_trial(api, trial)
+            trial_data = await _run_trial(api, trial, pressure_file)
+            print(trial_data)
     # test dispense flow-rates (per volume)
     trial = _build_default_trial(pipette)
     for flow_rate in flow_rates_dispense:
         for volume in aspirate_volumes:
             trial.flow_rate_dispense = flow_rate
             trial.aspirate_volume = volume
-            await _run_trial(api, trial)
+            trial_data = await _run_trial(api, trial, pressure_file)
+            print(trial_data)
 
 
 async def _main(
+    pressure_file: Path,
     is_simulating: bool,
     tip: int,
     offset_tip_rack: Point,
@@ -386,7 +437,21 @@ async def _main(
     file_results = test_data.create_file(
         test_name=TEST_NAME, tag=f"{pip_serial}-results", run_id=RUN_ID
     )
-    await _run_test(api, pipette, file_results)
+    await _run_test(api, pipette, file_results, pressure_file)
+
+
+def _find_pressure_file() -> Path:
+    # NOTE: this function relies on you already having started the
+    found_paths: List[Path] = []
+    for p in Path().resolve().iterdir():
+        if p.is_file and "pressure_test_" in p.name and ".csv" in p.name:
+            found_paths.append(p)
+    if not len(found_paths):
+        raise RuntimeError("unable to find pressure_test CSV")
+    found_paths.sort(key=lambda path: path.stat().st_mtime)
+    file = found_paths[-1]  # sorting by time, so biggest (newest) is at end
+    print(f"reading from pressure file: {file.name}")
+    return file
 
 
 if __name__ == "__main__":
@@ -400,6 +465,7 @@ if __name__ == "__main__":
     assert len(args.offset_reservoir) == 3
     asyncio.run(
         _main(
+            _find_pressure_file(),
             args.simulate,
             args.tip,
             Point(*args.offset_tip_rack),
