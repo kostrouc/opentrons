@@ -13,7 +13,7 @@ from opentrons_hardware.drivers.can_bus.abstract_driver import AbstractCanDriver
 from opentrons_hardware.firmware_bindings.constants import NodeId, SensorType, SensorId
 from opentrons_hardware.sensors import sensor_driver, sensor_types
 
-hms = "%H:%M:%S"
+hms = "%H:%M:%S.%f"
 
 
 @dataclass
