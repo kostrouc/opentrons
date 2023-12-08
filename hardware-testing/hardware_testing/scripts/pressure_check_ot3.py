@@ -291,7 +291,8 @@ class PressureSegment:
     average: float
     min: float
     max: float
-    stabilize_seconds: Optional[float]
+    seconds_to_stable: Optional[float]
+    stable_average: Optional[float]
 
     @classmethod
     def build(cls, data_lines: List[Tuple[datetime, float, bool]]) -> "PressureSegment":
@@ -299,17 +300,23 @@ class PressureSegment:
         times = [line[0] for line in data_lines]
         pascals = [line[1] for line in data_lines]
         stable_sec: Optional[float] = None
+        stable_avg: Optional[float] = None
+        stable_samples: List[float] = []
         for d in data_lines:
             if d[2]:
-                stable_sec = (d[0] - data_lines[0][0]).total_seconds()
-                break
+                if stable_sec is None:
+                    stable_sec = (d[0] - data_lines[0][0]).total_seconds()
+                stable_samples.append(d[1])
+        if stable_samples:
+            stable_avg = sum(stable_samples) / len(stable_samples)
         return PressureSegment(
             samples=data_lines,
             duration=(max(times) - min(times)).total_seconds(),
             average=sum(pascals) / len(pascals),
             min=min(pascals),
             max=max(pascals),
-            stabilize_seconds=stable_sec,
+            seconds_to_stable=stable_sec,
+            stable_average=stable_avg
         )
 
 
