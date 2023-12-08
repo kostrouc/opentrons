@@ -2,6 +2,7 @@
 import argparse
 import asyncio
 from dataclasses import dataclass
+from time import time
 from typing import List
 
 from opentrons_hardware.firmware_bindings.constants import SensorId
@@ -9,11 +10,14 @@ from opentrons_hardware.firmware_bindings.constants import SensorId
 from opentrons_shared_data.errors.exceptions import PipetteOverpressureError
 
 from opentrons.hardware_control.ot3api import OT3API
+from opentrons.hardware_control.instruments.ot3.pipette import Pipette
 
 from hardware_testing import data as test_data
 from hardware_testing.opentrons_api import types
 from hardware_testing.opentrons_api.types import Point
 from hardware_testing.opentrons_api import helpers_ot3
+
+TEST_NAME = "pressure-check-ot3"
 
 SLOTS_TIP_RACK = [2, 5, 6, 7, 8, 9, 10, 11]
 SLOT_RESERVOIR = 3
@@ -22,7 +26,15 @@ SLOT_TRASH = 12
 TRASH_HEIGHT_MM = 40
 
 DEFAULT_SUBMERGE_MM = -1.5  # aspirate depth below meniscus
+RUN_ID, START_TIME = test_data.create_run_id_and_start_time()
+
+test_running = True
+test_tag = ""
 well_top_to_meniscus_mm = 0.0
+
+
+def _seconds_elapsed() -> float:
+    return round(time() - START_TIME, 2)
 
 
 def _tip_position(slot: int, well: str) -> Point:
@@ -109,7 +121,7 @@ TEST_FLOW_RATE_DISPENSE = {
     8: {  # 8ch pipette
         50: {50: []},  # P50  # 50ul tip
         1000: {  # P1000
-            50: [],  # 50ul tip
+            50: [1, 5, 10, 15, 20],  # 50ul tip
             200: [],  # 200ul tip
             1000: [],  # 1000ul tip
         },
@@ -119,6 +131,7 @@ TEST_FLOW_RATE_DISPENSE = {
 
 @dataclass
 class PipetteSettings:
+    hw_pipette: Pipette
     mount: types.OT3Mount
     channels: int
     volume: int
@@ -140,6 +153,7 @@ class PipetteSettings:
         else:
             sids = [s for s in SensorId]
         return cls(
+            hw_pipette=pip,
             mount=types.OT3Mount.LEFT,
             channels=pip.channels.value,
             volume=1000 if "1000" in pip.name else 50,
@@ -197,35 +211,35 @@ async def _pick_up_tip(api: OT3API, pipette: PipetteSettings, tip_vol: int) -> N
 async def _drop_tip(
     api: OT3API, pipette: PipetteSettings, after_fail: bool = False
 ) -> None:
-    await api.retract(pipette.mount)
-    # offset both XY axes in trash
-    loc = trash_nominal + pipette.center_offset
-    await helpers_ot3.move_to_arched_ot3(api, pipette.mount, loc)
-    if after_fail:
-        attempt_count = 0
-        while True:
-            attempt_count += 1
-            print(f"dropping tip slowly (#{attempt_count})")
+    async def _drop() -> None:
+        await api.retract(pipette.mount)
+        loc = trash_nominal + pipette.center_offset
+        await helpers_ot3.move_to_arched_ot3(api, pipette.mount, loc)
+        await api.drop_tip(pipette.mount)
+        _tip_state = await api.get_tip_presence_status(pipette.mount)
+        assert _tip_state == types.TipStateType.ABSENT, "tip still detected"
+
+    attempt_count = 0
+    while True:
+        attempt_count += 1
+        print(f"dropping tip (#{attempt_count})")
+        if after_fail:
+            # slow down to some known safe speed
             _flow_rate_all(
                 api,
                 pipette,
                 FLOW_RATE_SAFE[pipette.channels][pipette.volume][pipette.tip],
             )
-            try:
-                await api.drop_tip(pipette.mount)
-                tip_state = await api.get_tip_presence_status(pipette.mount)
-                assert tip_state == types.TipStateType.ABSENT, "tip still detected"
-                break
-            except PipetteOverpressureError as e:
-                print(e)
-                print("\ntrying again (or just pull the tip off...)")
-                await api.home(list(types.Axis.gantry_axes()))
-                await helpers_ot3.move_to_arched_ot3(api, pipette.mount, loc)
-        await api.home_plunger(pipette.mount)
-    else:
-        await api.drop_tip(pipette.mount)
-        tip_state = await api.get_tip_presence_status(pipette.mount)
-        assert tip_state == types.TipStateType.ABSENT, "tip still detected"
+        try:
+            await _drop()
+            break
+        except PipetteOverpressureError as e:
+            print(e)
+            print("\ntrying again (or just pull the tip off...)")
+            after_fail = True
+            # gantry says it needs to reset position
+            await api.home(list(types.Axis.gantry_axes()))
+    await api.home_plunger(pipette.mount)
     await api.retract(pipette.mount)
 
 
@@ -321,38 +335,60 @@ def _build_default_trial(pipette: PipetteSettings) -> TrialSettings:
     )
 
 
-async def _run_test(api: OT3API, pipette: PipetteSettings, submerge: float) -> None:
-    aspirate_volumes = TEST_ASPIRATE_VOLUME[pipette.channels][pipette.volume][
-        pipette.tip
-    ]
-    flow_rates_aspirate = TEST_FLOW_RATE_ASPIRATE[pipette.channels][pipette.volume][
-        pipette.tip
-    ]
-    flow_rates_dispense = TEST_FLOW_RATE_DISPENSE[pipette.channels][pipette.volume][
-        pipette.tip
-    ]
-    # test aspirate flow-rates (per volume)
-    trial = _build_default_trial(pipette)
-    trial.submerge = submerge
-    for flow_rate in flow_rates_aspirate:
-        for volume in aspirate_volumes:
-            trial.flow_rate_aspirate = flow_rate
-            trial.volume = volume
-            await _run_trial(api, trial)
-    # test dispense flow-rates (per volume)
-    trial = _build_default_trial(pipette)
-    trial.submerge = submerge
-    for flow_rate in flow_rates_dispense:
-        for volume in aspirate_volumes:
-            trial.flow_rate_dispense = flow_rate
-            trial.volume = volume
-            await _run_trial(api, trial)
+async def _run_test(
+    api: OT3API, pipette: PipetteSettings, file: test_data.File
+) -> None:
+    global test_running, test_tag
+    try:
+        file.append("header,here")
+        aspirate_volumes = TEST_ASPIRATE_VOLUME[pipette.channels][pipette.volume][
+            pipette.tip
+        ]
+        flow_rates_aspirate = TEST_FLOW_RATE_ASPIRATE[pipette.channels][pipette.volume][
+            pipette.tip
+        ]
+        flow_rates_dispense = TEST_FLOW_RATE_DISPENSE[pipette.channels][pipette.volume][
+            pipette.tip
+        ]
+        print("aspirate_volumes")
+        print(aspirate_volumes)
+        print("flow_rates_aspirate")
+        print(flow_rates_aspirate)
+        print("flow_rates_dispense")
+        print(flow_rates_dispense)
+        # test aspirate flow-rates (per volume)
+        trial = _build_default_trial(pipette)
+        for flow_rate in flow_rates_aspirate:
+            for volume in aspirate_volumes:
+                trial.flow_rate_aspirate = flow_rate
+                trial.aspirate_volume = volume
+                test_tag = f"{trial.aspirate_volume}-{trial.flow_rate_aspirate}-{trial.flow_rate_dispense}"
+                await _run_trial(api, trial)
+                test_tag = ""
+        # test dispense flow-rates (per volume)
+        trial = _build_default_trial(pipette)
+        for flow_rate in flow_rates_dispense:
+            for volume in aspirate_volumes:
+                trial.flow_rate_dispense = flow_rate
+                trial.aspirate_volume = volume
+                test_tag = f"{trial.aspirate_volume}-{trial.flow_rate_aspirate}-{trial.flow_rate_dispense}"
+                await _run_trial(api, trial)
+                test_tag = ""
+    finally:
+        test_running = False
+
+
+async def _record_pressure(pipette: PipetteSettings, file: test_data.File, is_simulating: bool) -> None:
+    file.append("header,here\n")
+    with file.continuous_write(mode="append") as f:
+        while test_running:
+            f.write(f"{_seconds_elapsed()},{test_tag}\n")
+            await asyncio.sleep(0.01)
 
 
 async def _main(
     is_simulating: bool,
     tip: int,
-    submerge: float,
     offset_tip_rack: Point,
     offset_reservoir: Point,
 ) -> None:
@@ -362,20 +398,24 @@ async def _main(
     pipette = PipetteSettings.build(api, tip, offset_tip_rack, offset_reservoir)
     await _reset_hardware(api, pipette)
 
-    run_id = test_data.create_run_id()
-    test_name = "pressure-check-ot3"
-    tag = "tag"
-    file_name = test_data.create_file_name(test_name, run_id, tag)
-    test_data.dump_data_to_file(test_name, run_id, file_name, "header,here")
+    pip_serial = helpers_ot3.get_pipette_serial_ot3(pipette.hw_pipette)
+    file_results = test_data.create_file(
+        test_name=TEST_NAME, tag=f"{pip_serial}-results", run_id=RUN_ID
+    )
+    file_pressure = test_data.create_file(
+        test_name=TEST_NAME, tag=f"{pip_serial}-pressure", run_id=RUN_ID
+    )
 
-    await _run_test(api, pipette, submerge)
+    await asyncio.gather(
+        _run_test(api, pipette, file_results),
+        _record_pressure(pipette, file_pressure, api.is_simulator)
+    )
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--simulate", action="store_true")
     parser.add_argument("--tip", type=int, required=True)
-    parser.add_argument("--submerge", type=float, default=DEFAULT_SUBMERGE_MM)
     parser.add_argument("--offset-tip-rack", nargs="+", type=float, default=[0, 0, 0])
     parser.add_argument("--offset-reservoir", nargs="+", type=float, default=[0, 0, 0])
     args = parser.parse_args()
@@ -385,7 +425,6 @@ if __name__ == "__main__":
         _main(
             args.simulate,
             args.tip,
-            args.submerge,
             Point(*args.offset_tip_rack),
             Point(*args.offset_reservoir),
         )
