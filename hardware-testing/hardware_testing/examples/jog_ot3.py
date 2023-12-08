@@ -15,7 +15,7 @@ async def _exercise_pipette(api: OT3API, mount: types.OT3Mount) -> None:
         msg = (
             '"t"=tip pickup/drop, "p"=prepare-for-aspirate, "f"=flow-rate, ',
             '"a"=aspirate, "d"=dispense, "b"=blow-out, ',
-            '"j"=jog:'
+            '"j"=jog:',
         )
         _inp = input(msg).strip()
         try:

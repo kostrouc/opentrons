@@ -20,5 +20,5 @@ __all__ = [
     "CriticalPoint",
     "OT3AxisKind",
     "GripperProbe",
-    "TipStateType"
+    "TipStateType",
 ]
