@@ -1,4 +1,5 @@
 """Helper functions for the sensor scripts."""
+from asyncio import sleep
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -109,6 +110,7 @@ async def handle_pressure_sensor(
                 csv.write_dict({"time": curr_time, "data": data.to_float()})
         else:
             log.info(f"Pressure data not found at: {curr_time}")
+        await sleep(0.025)  # easing up on CAN bus, so other script can run too
 
     end_time_log = datetime.now().strftime(hms)
     text_end_time = f"Test ended at: {end_time_log}"
