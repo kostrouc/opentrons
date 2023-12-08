@@ -284,11 +284,24 @@ def _input_number(api: OT3API, msg: str) -> float:
         return _input_number(api, msg)
 
 
-async def _run_and_get_pressure(coro: Any, file: Path) -> List[Tuple[datetime, float]]:
-    start = datetime.now()
+async def _run_and_get_pressure(coro: Any, file: Path, simulate: bool) -> List[Tuple[datetime, float]]:
+    if simulate:
+        start = datetime.strptime("12:34:56.0", hms)
+    else:
+        start = datetime.now()
     await coro
-    end = datetime.now()
+    if simulate:
+        end = datetime.strptime("12:34:58.0", hms)
+    else:
+        end = datetime.now()
     return _read_lines(file, start, end)
+
+
+async def _delay(seconds: int, simulate: bool) -> None:
+    for i in range(seconds):
+        if i % 5 == 0:
+            print(f"\t{i}/{seconds} seconds")
+        await asyncio.sleep(0.01 if simulate else 1.0)
 
 
 async def _run_trial(api: OT3API, trial: TrialSettings, pressure_file: Path) -> List[List[Tuple[datetime, float]]]:
@@ -312,12 +325,14 @@ async def _run_trial(api: OT3API, trial: TrialSettings, pressure_file: Path) -> 
         )
         press_asp = await _run_and_get_pressure(
             api.aspirate(trial.pipette.mount, volume=trial.aspirate_volume),
-            pressure_file
+            pressure_file,
+            api.is_simulator
         )
         print("delaying after aspirate...")
         press_asp_del = await _run_and_get_pressure(
-            asyncio.sleep(60 * 2),
-            pressure_file
+            _delay(60 * 2, api.is_simulator),
+            pressure_file,
+            api.is_simulator
         )
         await api.move_rel(trial.pipette.mount, Point(z=abs(well_top_to_meniscus_mm)))
         print(
@@ -325,12 +340,14 @@ async def _run_trial(api: OT3API, trial: TrialSettings, pressure_file: Path) -> 
         )
         press_disp = await _run_and_get_pressure(
             api.blow_out(trial.pipette.mount),
-            pressure_file
+            pressure_file,
+            api.is_simulator
         )
         print("delaying after dispensing...")
         press_disp_del = await _run_and_get_pressure(
-            asyncio.sleep(60 * 2),
-            pressure_file
+            _delay(60 * 2, api.is_simulator),
+            pressure_file,
+            api.is_simulator
         )
         await api.retract(trial.pipette.mount)
         await _drop_tip(api, trial.pipette)
@@ -367,19 +384,21 @@ def _build_default_trial(pipette: PipetteSettings) -> TrialSettings:
 
 
 def _read_lines(file: Path, start: datetime, end: datetime) -> List[Tuple[datetime, float]]:
-    ret: List[Tuple[datetime, float]] = []
     with open(file, "r") as f:
         lines = f.readlines()
+    ret: List[Tuple[datetime, float]] = []
     for line in lines:
-        elements = [el for el in line.strip().split(",") if el]
+        elements = [el.strip() for el in line.strip().split(",") if el]
         try:
             assert len(elements) == 2
             dtime = datetime.strptime(elements[0], hms)
             pressure = float(elements[1])
             if start <= dtime <= end:
                 ret.append((dtime, pressure,))
-        except Exception:
+        except Exception as e:
+            print(e)
             continue
+    print(ret)
     return ret
 
 
