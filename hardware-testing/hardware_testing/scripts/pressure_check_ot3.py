@@ -338,52 +338,36 @@ def _build_default_trial(pipette: PipetteSettings) -> TrialSettings:
 async def _run_test(
     api: OT3API, pipette: PipetteSettings, file: test_data.File
 ) -> None:
-    global test_running, test_tag
-    try:
-        file.append("header,here")
-        aspirate_volumes = TEST_ASPIRATE_VOLUME[pipette.channels][pipette.volume][
-            pipette.tip
-        ]
-        flow_rates_aspirate = TEST_FLOW_RATE_ASPIRATE[pipette.channels][pipette.volume][
-            pipette.tip
-        ]
-        flow_rates_dispense = TEST_FLOW_RATE_DISPENSE[pipette.channels][pipette.volume][
-            pipette.tip
-        ]
-        print("aspirate_volumes")
-        print(aspirate_volumes)
-        print("flow_rates_aspirate")
-        print(flow_rates_aspirate)
-        print("flow_rates_dispense")
-        print(flow_rates_dispense)
-        # test aspirate flow-rates (per volume)
-        trial = _build_default_trial(pipette)
-        for flow_rate in flow_rates_aspirate:
-            for volume in aspirate_volumes:
-                trial.flow_rate_aspirate = flow_rate
-                trial.aspirate_volume = volume
-                test_tag = f"{trial.aspirate_volume}-{trial.flow_rate_aspirate}-{trial.flow_rate_dispense}"
-                await _run_trial(api, trial)
-                test_tag = ""
-        # test dispense flow-rates (per volume)
-        trial = _build_default_trial(pipette)
-        for flow_rate in flow_rates_dispense:
-            for volume in aspirate_volumes:
-                trial.flow_rate_dispense = flow_rate
-                trial.aspirate_volume = volume
-                test_tag = f"{trial.aspirate_volume}-{trial.flow_rate_aspirate}-{trial.flow_rate_dispense}"
-                await _run_trial(api, trial)
-                test_tag = ""
-    finally:
-        test_running = False
-
-
-async def _record_pressure(pipette: PipetteSettings, file: test_data.File, is_simulating: bool) -> None:
-    file.append("header,here\n")
-    with file.continuous_write(mode="append") as f:
-        while test_running:
-            f.write(f"{_seconds_elapsed()},{test_tag}\n")
-            await asyncio.sleep(0.01)
+    file.append("header,here")
+    aspirate_volumes = TEST_ASPIRATE_VOLUME[pipette.channels][pipette.volume][
+        pipette.tip
+    ]
+    flow_rates_aspirate = TEST_FLOW_RATE_ASPIRATE[pipette.channels][pipette.volume][
+        pipette.tip
+    ]
+    flow_rates_dispense = TEST_FLOW_RATE_DISPENSE[pipette.channels][pipette.volume][
+        pipette.tip
+    ]
+    print("aspirate_volumes")
+    print(aspirate_volumes)
+    print("flow_rates_aspirate")
+    print(flow_rates_aspirate)
+    print("flow_rates_dispense")
+    print(flow_rates_dispense)
+    # test aspirate flow-rates (per volume)
+    trial = _build_default_trial(pipette)
+    for flow_rate in flow_rates_aspirate:
+        for volume in aspirate_volumes:
+            trial.flow_rate_aspirate = flow_rate
+            trial.aspirate_volume = volume
+            await _run_trial(api, trial)
+    # test dispense flow-rates (per volume)
+    trial = _build_default_trial(pipette)
+    for flow_rate in flow_rates_dispense:
+        for volume in aspirate_volumes:
+            trial.flow_rate_dispense = flow_rate
+            trial.aspirate_volume = volume
+            await _run_trial(api, trial)
 
 
 async def _main(
@@ -402,14 +386,7 @@ async def _main(
     file_results = test_data.create_file(
         test_name=TEST_NAME, tag=f"{pip_serial}-results", run_id=RUN_ID
     )
-    file_pressure = test_data.create_file(
-        test_name=TEST_NAME, tag=f"{pip_serial}-pressure", run_id=RUN_ID
-    )
-
-    await asyncio.gather(
-        _run_test(api, pipette, file_results),
-        _record_pressure(pipette, file_pressure, api.is_simulator)
-    )
+    await _run_test(api, pipette, file_results)
 
 
 if __name__ == "__main__":
