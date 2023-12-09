@@ -1,14 +1,12 @@
 """Pressure-Check OT3."""
 import argparse
 import asyncio
-from datetime import datetime, timedelta
 from dataclasses import dataclass
 from pathlib import Path
 from time import time
 from typing import List, Tuple, Any, Optional
 
 from opentrons_hardware.firmware_bindings.constants import SensorId
-from opentrons_hardware.scripts.sensor_utils import hms
 
 from opentrons_shared_data.errors.exceptions import PipetteOverpressureError
 
@@ -189,6 +187,50 @@ class TrialSettings:
         )
 
 
+@dataclass
+class PressureSegment:
+    samples: List[Tuple[float, float, bool]]
+    duration: float
+    average: float
+    min: float
+    max: float
+    seconds_to_stable: Optional[float]
+    stable_average: Optional[float]
+
+    @classmethod
+    def build(cls, data_lines: List[Tuple[float, float, bool]]) -> "PressureSegment":
+        data_lines.sort(key=lambda _d: _d[0])
+        times = [line[0] for line in data_lines]
+        pascals = [line[1] for line in data_lines]
+        stable_sec: Optional[float] = None
+        stable_avg: Optional[float] = None
+        stable_samples: List[float] = []
+        for d in data_lines:
+            if d[2]:
+                if stable_sec is None:
+                    stable_sec = d[0] - data_lines[0][0]
+                stable_samples.append(d[1])
+        if stable_samples:
+            stable_avg = sum(stable_samples) / len(stable_samples)
+        return PressureSegment(
+            samples=data_lines,
+            duration=max(times) - min(times),
+            average=sum(pascals) / len(pascals),
+            min=min(pascals),
+            max=max(pascals),
+            seconds_to_stable=stable_sec,
+            stable_average=stable_avg,
+        )
+
+
+@dataclass
+class TrialResults:
+    min_pa: float
+    max_pa: float
+    stable_pa: float
+    stable_sec: float
+
+
 def _flow_rate_all(api: OT3API, pipette: PipetteSettings, _fr: float) -> None:
     api.set_flow_rate(pipette.mount, aspirate=_fr, dispense=_fr, blow_out=_fr)
 
@@ -255,97 +297,44 @@ async def _move_to_meniscus(api: OT3API, pip_settings: PipetteSettings) -> None:
     await helpers_ot3.move_to_arched_ot3(
         api, pip_settings.mount, loc + pip_settings.offset_reservoir
     )
-    if not well_top_to_meniscus_mm:
+    if not api.is_simulator and not well_top_to_meniscus_mm:
         while True:
-            _inp = _input(api, '"J" to jog down 1mm, or "stop" at meniscus: ').strip()
+            _inp = input('"J" to jog down 1mm, or "stop" at meniscus: ').strip()
             if _inp.lower() == "j":
                 await api.move_rel(pip_settings.mount, Point(z=-1.0))
                 well_top_to_meniscus_mm -= 1.0
-            elif _inp.lower() == "stop" or api.is_simulator:
+            elif _inp.lower() == "stop":
                 break
             else:
                 continue
 
 
-def _input(api: OT3API, msg: str) -> str:
-    if api.is_simulator:
-        print(msg)
-        return ""
-    return input(msg)
-
-
-def _input_number(api: OT3API, msg: str) -> float:
-    if api.is_simulator:
-        print(msg + "50")
-        return 50
-    try:
-        return float(_input(api, msg))
-    except ValueError:
-        return _input_number(api, msg)
-
-
-@dataclass
-class PressureSegment:
-    samples: List[Tuple[datetime, float, bool]]
-    duration: float
-    average: float
-    min: float
-    max: float
-    seconds_to_stable: Optional[float]
-    stable_average: Optional[float]
-
-    @classmethod
-    def build(cls, data_lines: List[Tuple[datetime, float, bool]]) -> "PressureSegment":
-        data_lines.sort(key=lambda _d: _d[0])
-        times = [line[0] for line in data_lines]
-        pascals = [line[1] for line in data_lines]
-        stable_sec: Optional[float] = None
-        stable_avg: Optional[float] = None
-        stable_samples: List[float] = []
-        for d in data_lines:
-            if d[2]:
-                if stable_sec is None:
-                    stable_sec = (d[0] - data_lines[0][0]).total_seconds()
-                stable_samples.append(d[1])
-        if stable_samples:
-            stable_avg = sum(stable_samples) / len(stable_samples)
-        return PressureSegment(
-            samples=data_lines,
-            duration=(max(times) - min(times)).total_seconds(),
-            average=sum(pascals) / len(pascals),
-            min=min(pascals),
-            max=max(pascals),
-            seconds_to_stable=stable_sec,
-            stable_average=stable_avg
-        )
-
-
-async def _run_and_get_pressure(
+async def _run_coro_and_get_pressure(
     coro: Any, file: Path, simulate: bool
 ) -> PressureSegment:
     if simulate:
-        start = datetime.strptime("12:34:56.0", hms)
+        start = 1702090000.0
     else:
-        start = datetime.now()
+        start = time()
     await coro
     if simulate:
-        end = datetime.strptime("12:34:58.0", hms)
+        end = start + 3.0
     else:
-        end = datetime.now()
+        end = time()
     with open(file, "r") as f:
         lines = f.readlines()
-    found_lines: List[Tuple[datetime, float, bool]] = []
+    found_lines: List[Tuple[float, float, bool]] = []
     for line in lines:
         elements = [el.strip() for el in line.strip().split(",") if el]
         try:
             assert len(elements) == 3
-            dtime = datetime.strptime(elements[0], hms)
-            if start <= dtime <= end:
+            _t = float(elements[0])
+            if start <= _t <= end:
                 pressure = float(elements[1])
                 stable = bool(int(elements[2]))
                 found_lines.append(
                     (
-                        dtime,
+                        _t,
                         pressure,
                         stable,
                     )
@@ -364,9 +353,11 @@ async def _delay(seconds: int, simulate: bool) -> None:
 
 
 async def _run_trial(
-    api: OT3API, trial: TrialSettings, pressure_file: Path
-) -> List[PressureSegment]:
-    print("\n\n\n\n----------")
+    api: OT3API,
+    trial: TrialSettings,
+    pressure_file: Path,
+    file_segments: test_data.File,
+) -> Tuple[TrialResults, TrialResults]:
     await _pick_up_tip(api, trial.pipette, int(trial.pipette.tip))
     await _move_to_meniscus(api, trial.pipette)
     await api.move_rel(trial.pipette.mount, Point(z=-abs(trial.submerge)))
@@ -376,32 +367,48 @@ async def _run_trial(
         dispense=trial.flow_rate_dispense,
         blow_out=trial.flow_rate_dispense,
     )
-    press_asp = []
-    press_asp_del = []
-    press_disp = []
-    press_disp_del = []
+    press_asp = None
+    press_asp_del = None
+    press_disp = None
+    press_disp_del = None
+
+    def _store_raw_data(seg: PressureSegment, action: str) -> None:
+        if "aspirate" in action:
+            fr = trial.flow_rate_aspirate
+        else:
+            fr = trial.flow_rate_dispense
+        for s in seg.samples:
+            file_segments.append(
+                f"{action},"
+                f"{trial.aspirate_volume},"
+                f"{fr},"
+                f"{s[0]},"
+                f"{s[1]},"
+                f"{int(s[2])}\n"
+            )
+
     try:
         print(
             f"aspirating {trial.aspirate_volume} uL at {trial.flow_rate_aspirate} ul/sec"
         )
-        press_asp = await _run_and_get_pressure(
+        press_asp = await _run_coro_and_get_pressure(
             api.aspirate(trial.pipette.mount, volume=trial.aspirate_volume),
             pressure_file,
             api.is_simulator,
         )
         print("delaying after aspirate...")
-        press_asp_del = await _run_and_get_pressure(
+        press_asp_del = await _run_coro_and_get_pressure(
             _delay(60 * 2, api.is_simulator), pressure_file, api.is_simulator
         )
         await api.move_rel(trial.pipette.mount, Point(z=abs(well_top_to_meniscus_mm)))
         print(
             f"dispensing {trial.aspirate_volume} uL at {trial.flow_rate_dispense} ul/sec"
         )
-        press_disp = await _run_and_get_pressure(
+        press_disp = await _run_coro_and_get_pressure(
             api.blow_out(trial.pipette.mount), pressure_file, api.is_simulator
         )
         print("delaying after dispensing...")
-        press_disp_del = await _run_and_get_pressure(
+        press_disp_del = await _run_coro_and_get_pressure(
             _delay(60 * 2, api.is_simulator), pressure_file, api.is_simulator
         )
         await api.retract(trial.pipette.mount)
@@ -410,18 +417,28 @@ async def _run_trial(
         print(e)
         await api.home(list(types.Axis.gantry_axes()))
         await _drop_tip(api, trial.pipette, after_fail=True)
-    return [press_asp, press_asp_del, press_disp, press_disp_del]
-
-
-async def _reset_hardware(api: OT3API, pipette: PipetteSettings) -> None:
-    await api.home([ax for ax in types.Axis.gantry_axes()])
-    tip_state = await api.get_tip_presence_status(pipette.mount)
-    if tip_state == types.TipStateType.PRESENT or api.is_simulator:
-        await api.add_tip(
-            pipette.mount, helpers_ot3.get_default_tip_length(pipette.tip)
+    finally:
+        if press_asp:
+            _store_raw_data(press_asp, action="aspirate")
+        if press_asp_del:
+            _store_raw_data(press_asp_del, action="aspirate-delay")
+        if press_disp:
+            _store_raw_data(press_disp, action="dispense")
+        if press_disp_del:
+            _store_raw_data(press_disp_del, action="dispense-delay")
+        aspirate_results = TrialResults(
+            min_pa=press_asp.min if press_asp else 0,
+            max_pa=press_asp.max if press_asp else 0,
+            stable_pa=press_asp_del.stable_average if press_asp_del else 0,
+            stable_sec=press_asp_del.seconds_to_stable if press_asp_del else 0,
         )
-        await _drop_tip(api, pipette, after_fail=True)
-    await api.home_plunger(pipette.mount)
+        dispense_results = TrialResults(
+            min_pa=press_disp.min if press_disp else 0,
+            max_pa=press_disp.max if press_disp else 0,
+            stable_pa=press_disp_del.stable_average if press_disp_del else 0,
+            stable_sec=press_disp_del.seconds_to_stable if press_disp_del else 0,
+        )
+    return aspirate_results, dispense_results
 
 
 def _build_default_trial(pipette: PipetteSettings) -> TrialSettings:
@@ -438,10 +455,14 @@ def _build_default_trial(pipette: PipetteSettings) -> TrialSettings:
     )
 
 
-async def _run_test(
-    api: OT3API, pipette: PipetteSettings, file: test_data.File, pressure_file: Path
+async def _test_action(
+    api: OT3API,
+    pipette: PipetteSettings,
+    file: test_data.File,
+    pressure_file: Path,
+    file_segments: test_data.File,
+    action: str,
 ) -> None:
-    file.append("header,here")
     aspirate_volumes = TEST_ASPIRATE_VOLUME[pipette.channels][pipette.volume][
         pipette.tip
     ]
@@ -451,28 +472,58 @@ async def _run_test(
     flow_rates_dispense = TEST_FLOW_RATE_DISPENSE[pipette.channels][pipette.volume][
         pipette.tip
     ]
-    print("aspirate_volumes")
-    print(aspirate_volumes)
-    print("flow_rates_aspirate")
-    print(flow_rates_aspirate)
-    print("flow_rates_dispense")
-    print(flow_rates_dispense)
-    # test aspirate flow-rates (per volume)
+    assert action in ["aspirate", "dispense"]
+
+    extra_commas = "," * len(aspirate_volumes)
+    file.append(
+        f"{action.upper()} - Min Pa,{extra_commas}"
+        f"{action.upper()} - Max Pa,{extra_commas}"
+        f"{action.upper()} - Stable Pa,{extra_commas}"
+        f"{action.upper()} - Stable Sec\n"
+    )
+    vols_in_header = (
+        f'flowrate (ul/sec),{"ul,".join([str(v) for v in aspirate_volumes]) + "ul"}'
+    )
+    file.append(
+        f"{vols_in_header},{vols_in_header},{vols_in_header},{vols_in_header}\n"
+    )
     trial = _build_default_trial(pipette)
-    for flow_rate in flow_rates_aspirate:
+    if action == "aspirate":
+        flow_rates_to_test = flow_rates_aspirate
+    else:
+        flow_rates_to_test = flow_rates_dispense
+    assert len(flow_rates_to_test)
+    assert len(aspirate_volumes)
+    for flow_rate in flow_rates_to_test:
+        res: List[TrialResults] = []
         for volume in aspirate_volumes:
-            trial.flow_rate_aspirate = flow_rate
+            if action == "aspirate":
+                trial.flow_rate_aspirate = flow_rate
+            else:
+                trial.flow_rate_dispense = flow_rate
             trial.aspirate_volume = volume
-            trial_data = await _run_trial(api, trial, pressure_file)
-            print(trial_data)
-    # test dispense flow-rates (per volume)
-    trial = _build_default_trial(pipette)
-    for flow_rate in flow_rates_dispense:
-        for volume in aspirate_volumes:
-            trial.flow_rate_dispense = flow_rate
-            trial.aspirate_volume = volume
-            trial_data = await _run_trial(api, trial, pressure_file)
-            print(trial_data)
+            trial_results = await _run_trial(api, trial, pressure_file, file_segments)
+            if action == "aspirate":
+                res.append(trial_results[0])
+            else:
+                res.append(trial_results[1])
+        file.append(
+            f'{flow_rate},{",".join([str(round(r.min_pa, 1)) for r in res])},'
+            f'{flow_rate},{",".join([str(round(r.max_pa, 1)) for r in res])},'
+            f'{flow_rate},{",".join([str(round(r.stable_pa, 1)) for r in res])},'
+            f'{flow_rate},{",".join([str(round(r.stable_sec, 1)) for r in res])}\n'
+        )
+
+
+async def _reset_hardware(api: OT3API, pipette: PipetteSettings) -> None:
+    await api.home([ax for ax in types.Axis.gantry_axes()])
+    tip_state = await api.get_tip_presence_status(pipette.mount)
+    if tip_state == types.TipStateType.PRESENT or api.is_simulator:
+        await api.add_tip(
+            pipette.mount, helpers_ot3.get_default_tip_length(pipette.tip)
+        )
+        await _drop_tip(api, pipette, after_fail=True)
+    await api.home_plunger(pipette.mount)
 
 
 async def _main(
@@ -492,7 +543,15 @@ async def _main(
     file_results = test_data.create_file(
         test_name=TEST_NAME, tag=f"{pip_serial}-results", run_id=RUN_ID
     )
-    await _run_test(api, pipette, file_results, pressure_file)
+    file_segments = test_data.create_file(
+        test_name=TEST_NAME, tag=f"{pip_serial}-segments", run_id=RUN_ID
+    )
+    await _test_action(
+        api, pipette, file_results, pressure_file, file_segments, action="aspirate"
+    )
+    await _test_action(
+        api, pipette, file_results, pressure_file, file_segments, action="dispense"
+    )
 
 
 def _find_pressure_file() -> Path:
