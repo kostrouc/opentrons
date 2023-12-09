@@ -24,43 +24,6 @@ SLOTS_TIP_RACK = [2, 5, 6, 7, 8, 9, 10, 11]
 SLOT_RESERVOIR = 3
 SLOT_TRASH = 12
 
-TRASH_HEIGHT_MM = 40
-
-DEFAULT_SUBMERGE_MM = -1.5  # aspirate depth below meniscus
-RUN_ID, START_TIME = test_data.create_run_id_and_start_time()
-
-test_running = True
-test_tag = ""
-well_top_to_meniscus_mm = 0.0
-
-
-def _seconds_elapsed() -> float:
-    return round(time() - START_TIME, 2)
-
-
-def _tip_position(slot: int, well: str) -> Point:
-    _rack_a1 = helpers_ot3.get_theoretical_a1_position(
-        slot, f"opentrons_flex_96_tiprack_50ul"  # all volumes are same size
-    )
-    x = 9 * (int(well[1:]) - 1)
-    y = -9 * "ABCDEFGH".index(well[0])
-    return _rack_a1 + Point(x=x, y=y, z=0)
-
-
-_available_tips: List[Point] = [
-    _tip_position(slot, f"{row}{col}")
-    for slot in SLOTS_TIP_RACK
-    for col in range(1, 13)
-    for row in "ABCDEFGH"
-]
-
-trash_nominal = helpers_ot3.get_slot_calibration_square_position_ot3(
-    SLOT_TRASH
-) + Point(z=TRASH_HEIGHT_MM)
-reservoir_a1 = helpers_ot3.get_theoretical_a1_position(
-    SLOT_RESERVOIR, f"nest_1_reservoir_195ml"
-)
-
 FLOW_RATE_SAFE = {
     1: {  # 1ch pipette
         50: {50: 5},  # P50  # 50ul tip
@@ -128,6 +91,41 @@ TEST_FLOW_RATE_DISPENSE = {
         },
     },
 }
+
+TRASH_HEIGHT_MM = 40
+
+DEFAULT_SUBMERGE_MM = -1.5  # aspirate depth below meniscus
+RUN_ID, START_TIME = test_data.create_run_id_and_start_time()
+
+well_top_to_meniscus_mm = 0.0
+
+
+def _seconds_elapsed() -> float:
+    return round(time() - START_TIME, 2)
+
+
+def _tip_position(slot: int, well: str) -> Point:
+    _rack_a1 = helpers_ot3.get_theoretical_a1_position(
+        slot, f"opentrons_flex_96_tiprack_50ul"  # all volumes are same size
+    )
+    x = 9 * (int(well[1:]) - 1)
+    y = -9 * "ABCDEFGH".index(well[0])
+    return _rack_a1 + Point(x=x, y=y, z=0)
+
+
+_available_tips: List[Point] = [
+    _tip_position(slot, f"{row}{col}")
+    for slot in SLOTS_TIP_RACK
+    for col in range(1, 13)
+    for row in "ABCDEFGH"
+]
+
+trash_nominal = helpers_ot3.get_slot_calibration_square_position_ot3(
+    SLOT_TRASH
+) + Point(z=TRASH_HEIGHT_MM)
+reservoir_a1 = helpers_ot3.get_theoretical_a1_position(
+    SLOT_RESERVOIR, f"nest_1_reservoir_195ml"
+)
 
 
 @dataclass
