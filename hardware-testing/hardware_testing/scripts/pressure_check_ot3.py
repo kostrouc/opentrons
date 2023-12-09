@@ -100,10 +100,6 @@ RUN_ID, START_TIME = test_data.create_run_id_and_start_time()
 well_top_to_meniscus_mm = 0.0
 
 
-def _seconds_elapsed() -> float:
-    return round(time() - START_TIME, 2)
-
-
 def _tip_position(slot: int, well: str) -> Point:
     _rack_a1 = helpers_ot3.get_theoretical_a1_position(
         slot, f"opentrons_flex_96_tiprack_50ul"  # all volumes are same size
@@ -204,7 +200,7 @@ class PressureSegment:
         stable_avg: Optional[float] = None
         stable_samples: List[float] = []
         for d in data_lines:
-            if d[2]:
+            if d[2]:  # stable flag
                 if stable_sec is None:
                     stable_sec = d[0] - data_lines[0][0]
                 stable_samples.append(d[1])
@@ -314,11 +310,14 @@ async def _run_coro_and_get_pressure(
         start = 1702090000.0
     else:
         start = time()
+    # FIXME: could also run the sensor driver here
+    #        instead of relying on separate process
     await coro
     if simulate:
         end = start + 3.0
     else:
         end = time()
+    # read the data from the CSV file
     with open(file, "r") as f:
         lines = f.readlines()
     found_lines: List[Tuple[float, float, bool]] = []
@@ -553,7 +552,7 @@ async def _main(
 
 
 def _find_pressure_file() -> Path:
-    # NOTE: this function relies on you already having started the
+    # NOTE: this function relies on you already having started the "sensors.py" script
     found_paths: List[Path] = []
     for p in Path().resolve().iterdir():
         if p.is_file and "pressure_test_" in p.name and ".csv" in p.name:
