@@ -66,7 +66,7 @@ TEST_FLOW_RATE_ASPIRATE = {
     8: {  # 8ch pipette
         50: {50: []},  # P50  # 50ul tip
         1000: {  # P1000
-            50: [1, 5, 10, 15, 20],  # 50ul tip
+            50: [1, 5, 10, 15, 20, 30, 50, 70, 100, 150],  # 50ul tip
             200: [],  # 200ul tip
             1000: [],  # 1000ul tip
         },
@@ -77,7 +77,7 @@ TEST_FLOW_RATE_DISPENSE = {
     1: {  # 1ch pipette
         50: {50: []},  # P50  # 50ul tip
         1000: {  # P1000
-            50: [1, 5, 10, 15, 20],  # 50ul tip
+            50: [],  # 50ul tip
             200: [],  # 200ul tip
             1000: [],  # 1000ul tip
         },
@@ -85,7 +85,7 @@ TEST_FLOW_RATE_DISPENSE = {
     8: {  # 8ch pipette
         50: {50: []},  # P50  # 50ul tip
         1000: {  # P1000
-            50: [1, 5, 10, 15, 20],  # 50ul tip
+            50: [1, 5, 10, 15, 20, 30, 50, 70, 100],  # 50ul tip
             200: [],  # 200ul tip
             1000: [],  # 1000ul tip
         },
@@ -193,6 +193,8 @@ class PressureSegment:
 
     @classmethod
     def build(cls, data_lines: List[Tuple[float, float, bool]]) -> "PressureSegment":
+        assert len(data_lines), "no pressure data found, " \
+                                "check sensors.py is running in same working directory"
         data_lines.sort(key=lambda _d: _d[0])
         times = [line[0] for line in data_lines]
         pascals = [line[1] for line in data_lines]
@@ -395,9 +397,8 @@ async def _run_trial(
             api.is_simulator,
         )
         print("delaying after aspirate...")
-        asp_del_seconds = {"dispense": 10, "aspirate": 60 * 2}[action]
         press_asp_del = await _run_coro_and_get_pressure(
-            _delay(asp_del_seconds, api.is_simulator), pressure_file, api.is_simulator
+            _delay(60 * 2, api.is_simulator), pressure_file, api.is_simulator
         )
         await api.move_rel(trial.pipette.mount, Point(z=abs(well_top_to_meniscus_mm)))
         print(
@@ -461,19 +462,24 @@ async def _test_action(
     pressure_file: Path,
     file_segments: test_data.File,
     action: str,
+    volumes: List[int],
+    flow_rates: List[int],
 ) -> None:
-    aspirate_volumes = TEST_ASPIRATE_VOLUME[pipette.channels][pipette.volume][
-        pipette.tip
-    ]
-    flow_rates_aspirate = TEST_FLOW_RATE_ASPIRATE[pipette.channels][pipette.volume][
-        pipette.tip
-    ]
-    flow_rates_dispense = TEST_FLOW_RATE_DISPENSE[pipette.channels][pipette.volume][
-        pipette.tip
-    ]
     assert action in ["aspirate", "dispense"]
+    if action == "aspirate":
+        fr = TEST_FLOW_RATE_ASPIRATE
+    else:
+        fr = TEST_FLOW_RATE_DISPENSE
+    flow_rates = flow_rates if flow_rates else fr[pipette.channels][pipette.volume][
+        pipette.tip
+    ]
+    assert len(flow_rates)
+    volumes = volumes if volumes else TEST_ASPIRATE_VOLUME[pipette.channels][pipette.volume][
+        pipette.tip
+    ]
+    assert len(volumes)
 
-    extra_commas = "," * len(aspirate_volumes)
+    extra_commas = "," * len(volumes)
     file.append(
         f"{action.upper()} - Min Pa,{extra_commas}"
         f"{action.upper()} - Max Pa,{extra_commas}"
@@ -481,21 +487,15 @@ async def _test_action(
         f"{action.upper()} - Stable Sec\n"
     )
     vols_in_header = (
-        f'ul/sec,{"ul,".join([str(v) for v in aspirate_volumes]) + "ul"}'
+        f'ul/sec,{"ul,".join([str(v) for v in volumes]) + "ul"}'
     )
     file.append(
         f"{vols_in_header},{vols_in_header},{vols_in_header},{vols_in_header}\n"
     )
     trial = _build_default_trial(pipette)
-    if action == "aspirate":
-        flow_rates_to_test = flow_rates_aspirate
-    else:
-        flow_rates_to_test = flow_rates_dispense
-    assert len(flow_rates_to_test)
-    assert len(aspirate_volumes)
-    for flow_rate in flow_rates_to_test:
+    for flow_rate in flow_rates:
         res: List[TrialResults] = []
-        for volume in aspirate_volumes:
+        for volume in volumes:
             if action == "aspirate":
                 trial.flow_rate_aspirate = flow_rate
             else:
@@ -533,6 +533,9 @@ async def _main(
     tip: int,
     offset_tip_rack: Point,
     offset_reservoir: Point,
+    aspirate_volumes: List[int],
+    aspirate_flow_rates: List[int],
+    dispense_flow_rates: List[int],
 ) -> None:
     api = await helpers_ot3.build_async_ot3_hardware_api(
         is_simulating=is_simulating, pipette_left="p1000_multi_v3.5"
@@ -549,11 +552,13 @@ async def _main(
     )
     if not skip_aspirate:
         await _test_action(
-            api, pipette, file_results, pressure_file, file_segments, action="aspirate"
+            api, pipette, file_results, pressure_file, file_segments,
+            action="aspirate", volumes=aspirate_volumes, flow_rates=aspirate_flow_rates,
         )
     if not skip_dispense:
         await _test_action(
-            api, pipette, file_results, pressure_file, file_segments, action="dispense"
+            api, pipette, file_results, pressure_file, file_segments,
+            action="dispense", volumes=aspirate_volumes, flow_rates=dispense_flow_rates,
         )
 
 
@@ -579,6 +584,9 @@ if __name__ == "__main__":
     parser.add_argument("--skip-dispense", action="store_true")
     parser.add_argument("--offset-tip-rack", nargs="+", type=float, default=[0, 0, 0])
     parser.add_argument("--offset-reservoir", nargs="+", type=float, default=[0, 0, 0])
+    parser.add_argument("--aspirate-volumes", nargs="+", type=int, default=[])
+    parser.add_argument("--aspirate-flow-rates", nargs="+", type=int, default=[])
+    parser.add_argument("--dispense-flow-rates", nargs="+", type=int, default=[])
     args = parser.parse_args()
     assert len(args.offset_tip_rack) == 3
     assert len(args.offset_reservoir) == 3
@@ -591,5 +599,8 @@ if __name__ == "__main__":
             args.tip,
             Point(*args.offset_tip_rack),
             Point(*args.offset_reservoir),
+            args.aspirate_volumes,
+            args.aspirate_flow_rates,
+            args.dispense_flow_rates
         )
     )
