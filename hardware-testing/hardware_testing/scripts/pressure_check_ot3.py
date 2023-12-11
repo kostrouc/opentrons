@@ -479,7 +479,7 @@ async def _test_action(
         f"{action.upper()} - Stable Sec\n"
     )
     vols_in_header = (
-        f'flowrate (ul/sec),{"ul,".join([str(v) for v in aspirate_volumes]) + "ul"}'
+        f'ul/sec,{"ul,".join([str(v) for v in aspirate_volumes]) + "ul"}'
     )
     file.append(
         f"{vols_in_header},{vols_in_header},{vols_in_header},{vols_in_header}\n"
@@ -526,6 +526,8 @@ async def _reset_hardware(api: OT3API, pipette: PipetteSettings) -> None:
 async def _main(
     pressure_file: Path,
     is_simulating: bool,
+    skip_aspirate: bool,
+    skip_dispense: bool,
     tip: int,
     offset_tip_rack: Point,
     offset_reservoir: Point,
@@ -543,12 +545,14 @@ async def _main(
     file_segments = test_data.create_file(
         test_name=TEST_NAME, tag=f"{pip_serial}-segments", run_id=RUN_ID
     )
-    await _test_action(
-        api, pipette, file_results, pressure_file, file_segments, action="aspirate"
-    )
-    await _test_action(
-        api, pipette, file_results, pressure_file, file_segments, action="dispense"
-    )
+    if not skip_aspirate:
+        await _test_action(
+            api, pipette, file_results, pressure_file, file_segments, action="aspirate"
+        )
+    if not skip_dispense:
+        await _test_action(
+            api, pipette, file_results, pressure_file, file_segments, action="dispense"
+        )
 
 
 def _find_pressure_file() -> Path:
@@ -569,6 +573,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--simulate", action="store_true")
     parser.add_argument("--tip", type=int, required=True)
+    parser.add_argument("--skip-aspirate", action="store_true")
+    parser.add_argument("--skip-dispense", action="store_true")
     parser.add_argument("--offset-tip-rack", nargs="+", type=float, default=[0, 0, 0])
     parser.add_argument("--offset-reservoir", nargs="+", type=float, default=[0, 0, 0])
     args = parser.parse_args()
@@ -578,6 +584,8 @@ if __name__ == "__main__":
         _main(
             _find_pressure_file(),
             args.simulate,
+            args.skip_aspirate,
+            args.skip_dispense,
             args.tip,
             Point(*args.offset_tip_rack),
             Point(*args.offset_reservoir),
