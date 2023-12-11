@@ -88,7 +88,14 @@ async def handle_pressure_sensor(
     """Function to read data from the pressure sensor."""
     start_time = datetime.now()
     csv = None
-    pressure = sensor_types.PressureSensor.build(SensorId.S0, node_id)
+    if "y" in input("is this an 8ch or 96ch? (y/n): ").lower():
+        sensor_ids = [SensorId.S0, SensorId.S1]
+    else:
+        sensor_ids = [SensorId.S0]
+    sensors = {
+        s: sensor_types.PressureSensor.build(s, node_id)
+        for s in sensor_ids
+    }
     s_driver = sensor_driver.SensorDriver()
     if include_csv:
         metadata = CSVMetaData(
@@ -102,36 +109,55 @@ async def handle_pressure_sensor(
     end_time = start_time + timedelta(minutes=command.minutes)
     messenger = CanMessenger(driver=driver)
     messenger.start()
-    prev_1_second: List[Tuple[float, float]] = []
-    stable = False
+    prev_1_second: Dict[SensorId, List[Tuple[float, float]]] = {
+        sid: []
+        for sid in sensor_ids
+    }
+    stable_per_ch = {sid: False for sid in sensor_ids}
+    all_stable = False
     stable_seconds = 1.0
     stable_pascals = 5.0
-    while datetime.now() < end_time:
-        data = await s_driver.read(messenger, pressure, offset=False, timeout=10)
-        curr_time = time()
-        # check for stability
-        prev_1_second.append((curr_time, data.to_float(),))
-        while prev_1_second[0][0] < curr_time - stable_seconds:
-            prev_1_second.pop(0)
-            pascals = [d[1] for d in prev_1_second]
-            stable = bool(max(pascals) - min(pascals) <= stable_pascals)
-        if isinstance(data, SensorDataType):
-            log.info(f"Pressure data: {data.to_float()} at: {curr_time}")
-            if csv:
-                csv.write_dict({
-                    "time": curr_time,
-                    "data": data.to_float(),
-                    "stable": int(stable)
-                })
-        else:
-            log.info(f"Pressure data not found")
-        await sleep(0.025)  # easing up on CAN bus, so other script can run too
+    _print_timestamp = time()
 
-    end_time_log = datetime.now().strftime(hms)
-    text_end_time = f"Test ended at: {end_time_log}"
-    log.info(text_end_time)
-    if csv:
-        csv.write(text_end_time)
+    async def _read(_s: sensor_types.PressureSensor) -> Tuple[float, float]:
+        try:
+            d = await s_driver.read(messenger, _s, offset=False, timeout=10)
+            t = time()
+        except Exception as exc:
+            print(exc)
+            await sleep(0.1)
+            return await _read(_s)
+        if not isinstance(d, SensorDataType):
+            print(f"got no data: {curr_time}")
+            await sleep(0.1)
+            return await _read(_s)
+        await sleep(0.025)
+        return t, d.to_float()
+
+    while datetime.now() < end_time:
+        datas: Dict[SensorId, Tuple[float, float]] = {
+            sid: await _read(sensor) for sid, sensor in sensors.items()
+        }
+        curr_time = datas[SensorId.S0][0]
+        if curr_time - _print_timestamp > 1.0:
+            print([data[1] for data in datas.values()])
+            _print_timestamp = curr_time
+        # check for stability
+        for sid in sensor_ids:
+            prev_1_second[sid].append(datas[sid])
+            while prev_1_second[sid][0][0] < curr_time - stable_seconds:
+                prev_1_second[sid].pop(0)
+                pascals = [d[1] for d in prev_1_second[sid]]
+                stable_per_ch[sid] = bool(max(pascals) - min(pascals) <= stable_pascals)
+                all_stable = sum([1 for s in stable_per_ch.values() if s]) == len(sensor_ids)
+        if csv:
+            all_pa = [d[1] for d in datas.values()]
+            csv.write_dict({
+                "time": curr_time,
+                "data": sum(all_pa) / len(all_pa),
+                "stable": int(all_stable)
+            })
+
     await messenger.stop()
 
 
