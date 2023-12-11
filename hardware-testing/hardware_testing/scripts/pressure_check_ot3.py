@@ -4,7 +4,7 @@ import asyncio
 from dataclasses import dataclass
 from pathlib import Path
 from time import time
-from typing import List, Tuple, Any, Optional
+from typing import List, Tuple, Any, Optional, Dict
 
 from opentrons_hardware.firmware_bindings.constants import SensorId
 
@@ -167,8 +167,7 @@ class TrialSettings:
     pipette: PipetteSettings
     aspirate_volume: float
     submerge: float
-    flow_rate_aspirate: float
-    flow_rate_dispense: float
+    flow_rate: Dict[str, float]
 
     def __str__(self) -> str:
         return (
@@ -355,17 +354,16 @@ async def _run_trial(
     api: OT3API,
     trial: TrialSettings,
     pressure_file: Path,
-    file_segments: test_data.File,
-    action: str
+    file_segments: test_data.File
 ) -> Tuple[TrialResults, TrialResults]:
     await _pick_up_tip(api, trial.pipette, int(trial.pipette.tip))
     await _move_to_meniscus(api, trial.pipette)
     await api.move_rel(trial.pipette.mount, Point(z=-abs(trial.submerge)))
     api.set_flow_rate(
         trial.pipette.mount,
-        aspirate=trial.flow_rate_aspirate,
-        dispense=trial.flow_rate_dispense,
-        blow_out=trial.flow_rate_dispense,
+        aspirate=trial.flow_rate["aspirate"],
+        dispense=trial.flow_rate["dispense"],
+        blow_out=trial.flow_rate["dispense"],
     )
     press_asp = None
     press_asp_del = None
@@ -374,9 +372,9 @@ async def _run_trial(
 
     def _store_raw_data(seg: PressureSegment, action: str) -> None:
         if "aspirate" in action:
-            fr = trial.flow_rate_aspirate
+            fr = trial.flow_rate["aspirate"]
         else:
-            fr = trial.flow_rate_dispense
+            fr = trial.flow_rate["dispense"]
         for s in seg.samples:
             file_segments.append(
                 f"{action},"
@@ -389,7 +387,7 @@ async def _run_trial(
 
     try:
         print(
-            f"aspirating {trial.aspirate_volume} uL at {trial.flow_rate_aspirate} ul/sec"
+            f"aspirating {trial.aspirate_volume} uL at {trial.flow_rate['aspirate']} ul/sec"
         )
         press_asp = await _run_coro_and_get_pressure(
             api.aspirate(trial.pipette.mount, volume=trial.aspirate_volume),
@@ -402,7 +400,7 @@ async def _run_trial(
         )
         await api.move_rel(trial.pipette.mount, Point(z=abs(well_top_to_meniscus_mm)))
         print(
-            f"dispensing {trial.aspirate_volume} uL at {trial.flow_rate_dispense} ul/sec"
+            f"dispensing {trial.aspirate_volume} uL at {trial.flow_rate['dispense']} ul/sec"
         )
         press_disp = await _run_coro_and_get_pressure(
             api.blow_out(trial.pipette.mount), pressure_file, api.is_simulator
@@ -426,15 +424,19 @@ async def _run_trial(
             _store_raw_data(press_disp, action="dispense")
         if press_disp_del:
             _store_raw_data(press_disp_del, action="dispense-delay")
+        asp_min = min(press_asp.min if press_asp else 0, press_asp_del.min if press_asp_del else 0)
+        asp_max = max(press_asp.max if press_asp else 0, press_asp_del.max if press_asp_del else 0)
+        disp_min = min(press_disp.min if press_disp else 0, press_disp_del.min if press_disp_del else 0)
+        disp_max = max(press_disp.max if press_disp else 0, press_disp_del.max if press_disp_del else 0)
         aspirate_results = TrialResults(
-            min_pa=press_asp.min if press_asp else 0,
-            max_pa=press_asp.max if press_asp else 0,
+            min_pa=asp_min,
+            max_pa=asp_max,
             stable_pa=press_asp_del.stable_average if press_asp_del else 0,
             stable_sec=press_asp_del.seconds_to_stable if press_asp_del else 0,
         )
         dispense_results = TrialResults(
-            min_pa=press_disp.min if press_disp else 0,
-            max_pa=press_disp.max if press_disp else 0,
+            min_pa=disp_min,
+            max_pa=disp_max,
             stable_pa=press_disp_del.stable_average if press_disp_del else 0,
             stable_sec=press_disp_del.seconds_to_stable if press_disp_del else 0,
         )
@@ -442,16 +444,14 @@ async def _run_trial(
 
 
 def _build_default_trial(pipette: PipetteSettings) -> TrialSettings:
+    safe_flow_rate = FLOW_RATE_SAFE[pipette.channels][pipette.volume][
+        pipette.tip
+    ]
     return TrialSettings(
         pipette=pipette,
         aspirate_volume=0,
         submerge=DEFAULT_SUBMERGE_MM,
-        flow_rate_aspirate=FLOW_RATE_SAFE[pipette.channels][pipette.volume][
-            pipette.tip
-        ],
-        flow_rate_dispense=FLOW_RATE_SAFE[pipette.channels][pipette.volume][
-            pipette.tip
-        ],
+        flow_rate={"aspirate": safe_flow_rate, "dispense": safe_flow_rate},
     )
 
 
@@ -496,12 +496,9 @@ async def _test_action(
     for flow_rate in flow_rates:
         res: List[TrialResults] = []
         for volume in volumes:
-            if action == "aspirate":
-                trial.flow_rate_aspirate = flow_rate
-            else:
-                trial.flow_rate_dispense = flow_rate
+            trial.flow_rate[action] = flow_rate
             trial.aspirate_volume = volume
-            trial_results = await _run_trial(api, trial, pressure_file, file_segments, action)
+            trial_results = await _run_trial(api, trial, pressure_file, file_segments)
             if action == "aspirate":
                 res.append(trial_results[0])
             else:
