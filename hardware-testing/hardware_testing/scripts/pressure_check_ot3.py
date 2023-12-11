@@ -354,6 +354,7 @@ async def _run_trial(
     trial: TrialSettings,
     pressure_file: Path,
     file_segments: test_data.File,
+    action: str
 ) -> Tuple[TrialResults, TrialResults]:
     await _pick_up_tip(api, trial.pipette, int(trial.pipette.tip))
     await _move_to_meniscus(api, trial.pipette)
@@ -394,8 +395,9 @@ async def _run_trial(
             api.is_simulator,
         )
         print("delaying after aspirate...")
+        asp_del_seconds = {"dispense": 10, "aspirate": 60 * 2}[action]
         press_asp_del = await _run_coro_and_get_pressure(
-            _delay(60 * 2, api.is_simulator), pressure_file, api.is_simulator
+            _delay(asp_del_seconds, api.is_simulator), pressure_file, api.is_simulator
         )
         await api.move_rel(trial.pipette.mount, Point(z=abs(well_top_to_meniscus_mm)))
         print(
@@ -406,7 +408,7 @@ async def _run_trial(
         )
         print("delaying after dispensing...")
         press_disp_del = await _run_coro_and_get_pressure(
-            _delay(60 * 2, api.is_simulator), pressure_file, api.is_simulator
+            _delay(10, api.is_simulator), pressure_file, api.is_simulator
         )
         await api.retract(trial.pipette.mount)
         await _drop_tip(api, trial.pipette)
@@ -499,7 +501,7 @@ async def _test_action(
             else:
                 trial.flow_rate_dispense = flow_rate
             trial.aspirate_volume = volume
-            trial_results = await _run_trial(api, trial, pressure_file, file_segments)
+            trial_results = await _run_trial(api, trial, pressure_file, file_segments, action)
             if action == "aspirate":
                 res.append(trial_results[0])
             else:
