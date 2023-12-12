@@ -24,6 +24,9 @@ SLOTS_TIP_RACK = [2, 5, 6, 7, 8, 9, 10, 11]
 SLOT_RESERVOIR = 3
 SLOT_TRASH = 12
 
+ASPIRATE_DELAY_SEC = 60 * 2
+DISPENSE_DELAY_SEC = 10
+
 FLOW_RATE_SAFE = {
     1: {  # 1ch pipette
         50: {50: 5},  # P50  # 50ul tip
@@ -197,12 +200,12 @@ class PressureSegment:
         data_lines.sort(key=lambda _d: _d[0])
         times = [line[0] for line in data_lines]
         pascals = [line[1] for line in data_lines]
-        stable_sec: Optional[float] = None
-        stable_avg: Optional[float] = None
+        stable_sec: float = 0.0
+        stable_avg: float = 0.0
         stable_samples: List[float] = []
         for d in data_lines:
             if d[2]:  # stable flag
-                if stable_sec is None:
+                if not stable_sec:
                     stable_sec = d[0] - data_lines[0][0]
                 stable_samples.append(d[1])
         if stable_samples:
@@ -396,7 +399,7 @@ async def _run_trial(
         )
         print("delaying after aspirate...")
         press_asp_del = await _run_coro_and_get_pressure(
-            _delay(60 * 2, api.is_simulator), pressure_file, api.is_simulator
+            _delay(ASPIRATE_DELAY_SEC, api.is_simulator), pressure_file, api.is_simulator
         )
         await api.move_rel(trial.pipette.mount, Point(z=abs(well_top_to_meniscus_mm)))
         print(
@@ -407,7 +410,7 @@ async def _run_trial(
         )
         print("delaying after dispensing...")
         press_disp_del = await _run_coro_and_get_pressure(
-            _delay(10, api.is_simulator), pressure_file, api.is_simulator
+            _delay(DISPENSE_DELAY_SEC, api.is_simulator), pressure_file, api.is_simulator
         )
         await api.retract(trial.pipette.mount)
         await _drop_tip(api, trial.pipette)
@@ -426,19 +429,23 @@ async def _run_trial(
             _store_raw_data(press_disp_del, action="dispense-delay")
         asp_min = min(press_asp.min if press_asp else 0, press_asp_del.min if press_asp_del else 0)
         asp_max = max(press_asp.max if press_asp else 0, press_asp_del.max if press_asp_del else 0)
+        asp_st_pa = press_asp_del.stable_average if press_asp_del and press_asp_del.stable_average else 0
+        asp_st_sec = press_asp_del.seconds_to_stable if press_asp_del and press_asp_del.seconds_to_stable else 0
         disp_min = min(press_disp.min if press_disp else 0, press_disp_del.min if press_disp_del else 0)
         disp_max = max(press_disp.max if press_disp else 0, press_disp_del.max if press_disp_del else 0)
+        disp_st_pa = press_disp_del.stable_average if press_disp_del and press_disp_del.stable_average else 0
+        disp_st_sec = press_disp_del.seconds_to_stable if press_disp_del and press_disp_del.seconds_to_stable else 0
         aspirate_results = TrialResults(
             min_pa=asp_min,
             max_pa=asp_max,
-            stable_pa=press_asp_del.stable_average if press_asp_del else 0,
-            stable_sec=press_asp_del.seconds_to_stable if press_asp_del else 0,
+            stable_pa=asp_st_pa,
+            stable_sec=asp_st_sec if asp_st_sec else ASPIRATE_DELAY_SEC,
         )
         dispense_results = TrialResults(
             min_pa=disp_min,
             max_pa=disp_max,
-            stable_pa=press_disp_del.stable_average if press_disp_del else 0,
-            stable_sec=press_disp_del.seconds_to_stable if press_disp_del else 0,
+            stable_pa=disp_st_pa,
+            stable_sec=disp_st_sec if disp_st_sec else DISPENSE_DELAY_SEC,
         )
     return aspirate_results, dispense_results
 
