@@ -66,8 +66,8 @@ TEST_FLOW_RATE_ASPIRATE = {
     8: {  # 8ch pipette
         50: {50: []},  # P50  # 50ul tip
         1000: {  # P1000
-            50: [1, 5, 10, 15, 20, 30, 50, 70, 100, 150],  # 50ul tip
-            200: [],  # 200ul tip
+            50: [1, 5, 10, 15, 20, 30, 50, 70, 100, 200],  # 50ul tip
+            200: [1, 5, 10, 15, 20, 30, 50, 70, 100, 200],  # 200ul tip
             1000: [],  # 1000ul tip
         },
     },
@@ -85,8 +85,8 @@ TEST_FLOW_RATE_DISPENSE = {
     8: {  # 8ch pipette
         50: {50: []},  # P50  # 50ul tip
         1000: {  # P1000
-            50: [1, 5, 10, 15, 20, 30, 50, 70, 100],  # 50ul tip
-            200: [],  # 200ul tip
+            50: [1, 5, 10, 15, 20, 30, 50, 70, 100, 200],  # 50ul tip
+            200: [1, 5, 10, 15, 20, 30, 50, 70, 100, 200],  # 200ul tip
             1000: [],  # 1000ul tip
         },
     },
@@ -175,8 +175,8 @@ class TrialSettings:
             f"pipette-{self.pipette.volume}_"
             f"tip-{self.pipette.tip}_"
             f"aspirate-volume-{self.aspirate_volume}_"
-            f"flow-rate-aspirate-{self.flow_rate_aspirate}_"
-            f"flow-rate-dispense-{self.flow_rate_dispense}"
+            f"flow-rate-aspirate-{self.flow_rate['aspirate']}_"
+            f"flow-rate-dispense-{self.flow_rate['dispense']}"
         )
 
 
@@ -480,11 +480,12 @@ async def _test_action(
     assert len(volumes)
 
     extra_commas = "," * len(volumes)
+    file.append(f"{action.upper()}")
     file.append(
-        f"{action.upper()} - Min Pa,{extra_commas}"
-        f"{action.upper()} - Max Pa,{extra_commas}"
-        f"{action.upper()} - Stable Pa,{extra_commas}"
-        f"{action.upper()} - Stable Sec\n"
+        f"MIN Pa,{extra_commas}"
+        f"MAX Pa,{extra_commas}"
+        f"STABLE Pa,{extra_commas}"
+        f"STABLE Sec\n"
     )
     vols_in_header = (
         f'ul/sec,{"ul,".join([str(v) for v in volumes]) + "ul"}'
