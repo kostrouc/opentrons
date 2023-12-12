@@ -131,7 +131,7 @@ async def handle_pressure_sensor(
             print(f"got no data: {curr_time}")
             await sleep(0.1)
             return await _read(_s)
-        await sleep(0.025)
+        await sleep(0.05)
         return t, d.to_float()
 
     while datetime.now() < end_time:
