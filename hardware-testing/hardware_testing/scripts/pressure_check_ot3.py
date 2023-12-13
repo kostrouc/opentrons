@@ -24,8 +24,10 @@ SLOTS_TIP_RACK = [2, 5, 6, 7, 8, 9, 10, 11]
 SLOT_RESERVOIR = 3
 SLOT_TRASH = 12
 
-ASPIRATE_DELAY_SEC = 60 * 2
-DISPENSE_DELAY_SEC = 10
+ASPIRATE_DELAY_SEC_BY_TIP = {
+    50: 60, 200: 30, 1000: 15  # smaller tips take longer to stabilize
+}
+DISPENSE_DELAY_SEC = 3
 
 FLOW_RATE_SAFE = {
     1: {  # 1ch pipette
@@ -38,59 +40,64 @@ FLOW_RATE_SAFE = {
     },
 }
 
+_default_volumes = [5, 10, 20, 50]
+
 TEST_ASPIRATE_VOLUME = {
     1: {  # 1ch pipette
-        50: {50: [1, 5, 10, 20, 50]},  # P50  # 50ul tip
+        50: {50: [1] + _default_volumes},  # P50  # 50ul tip
         1000: {  # P1000
-            50: [5, 10, 20, 50],  # 50ul tip
-            200: [5, 20, 100, 200],  # 200ul tip
-            1000: [10, 100, 200, 1000],  # 1000ul tip
+            50: _default_volumes,  # 50ul tip
+            200: _default_volumes + [200],  # 200ul tip
+            1000: _default_volumes + [200, 1000],  # 1000ul tip
         },
     },
     8: {  # 8ch pipette
-        50: {50: [1, 5, 10, 20, 50]},  # P50  # 50ul tip
+        50: {50: [1] + _default_volumes},  # P50  # 50ul tip
         1000: {  # P1000
-            50: [5, 10, 20, 50],  # 50ul tip
-            200: [5, 20, 100, 200],  # 200ul tip
-            1000: [10, 100, 200, 1000],  # 1000ul tip
+            50: _default_volumes,  # 50ul tip
+            200: _default_volumes + [200],  # 200ul tip
+            1000: _default_volumes + [200, 1000],  # 1000ul tip
         },
     },
 }
 
+_default_flow_rates = [5, 10, 15, 20, 30, 50]
+_default_flow_rates_p1000 = _default_flow_rates + [100, 200]
+
 TEST_FLOW_RATE_ASPIRATE = {
     1: {  # 1ch pipette
-        50: {50: []},  # P50  # 50ul tip
+        50: {50: [1] + _default_flow_rates},  # P50  # 50ul tip
         1000: {  # P1000
-            50: [1, 5, 10, 15, 20, 30, 50, 70, 100, 200],  # 50ul tip
-            200: [1, 5, 10, 15, 20, 30, 50, 70, 100, 200],  # 200ul tip
-            1000: [5, 10, 15, 20, 30, 50, 70, 100, 200, 500],  # 1000ul tip
+            50: [1] + _default_flow_rates_p1000,  # 50ul tip
+            200: [1] + _default_flow_rates_p1000,  # 200ul tip
+            1000: _default_flow_rates_p1000 + [500],  # 1000ul tip
         },
     },
     8: {  # 8ch pipette
-        50: {50: []},  # P50  # 50ul tip
+        50: {50: [1] + _default_flow_rates},  # P50  # 50ul tip
         1000: {  # P1000
-            50: [1, 5, 10, 15, 20, 30, 50, 70, 100, 200],  # 50ul tip
-            200: [1, 5, 10, 15, 20, 30, 50, 70, 100, 200],  # 200ul tip
-            1000: [5, 10, 15, 20, 30, 50, 70, 100, 200, 500],  # 1000ul tip
+            50: [1] + _default_flow_rates_p1000,  # 50ul tip
+            200: [1] + _default_flow_rates_p1000,  # 200ul tip
+            1000: _default_flow_rates_p1000 + [500],  # 1000ul tip
         },
     },
 }
 
 TEST_FLOW_RATE_DISPENSE = {
     1: {  # 1ch pipette
-        50: {50: []},  # P50  # 50ul tip
+        50: {50: [1] + _default_flow_rates},  # P50  # 50ul tip
         1000: {  # P1000
-            50: [1, 5, 10, 15, 20, 30, 50, 70, 100, 200],  # 50ul tip
-            200: [1, 5, 10, 15, 20, 30, 50, 70, 100, 200],  # 200ul tip
-            1000: [5, 10, 15, 20, 30, 50, 70, 100, 200, 500],  # 1000ul tip
+            50: [1] + _default_flow_rates_p1000,  # 50ul tip
+            200: [1] + _default_flow_rates_p1000,  # 200ul tip
+            1000: _default_flow_rates_p1000 + [500],  # 1000ul tip
         },
     },
     8: {  # 8ch pipette
-        50: {50: []},  # P50  # 50ul tip
+        50: {50: [1] + _default_flow_rates},  # P50  # 50ul tip
         1000: {  # P1000
-            50: [1, 5, 10, 15, 20, 30, 50, 70, 100, 200],  # 50ul tip
-            200: [1, 5, 10, 15, 20, 30, 50, 70, 100, 200],  # 200ul tip
-            1000: [5, 10, 15, 20, 30, 50, 70, 100, 200, 500],  # 1000ul tip
+            50: [1] + _default_flow_rates_p1000,  # 50ul tip
+            200: [1] + _default_flow_rates_p1000,  # 200ul tip
+            1000: _default_flow_rates_p1000 + [500],  # 1000ul tip
         },
     },
 }
@@ -400,8 +407,9 @@ async def _run_trial(
             api.is_simulator,
         )
         print("delaying after aspirate...")
+        asp_del_sec = ASPIRATE_DELAY_SEC_BY_TIP[trial.pipette.tip]
         press_asp_del = await _run_coro_and_get_pressure(
-            _delay(ASPIRATE_DELAY_SEC, api.is_simulator), pressure_file, api.is_simulator
+            _delay(asp_del_sec, api.is_simulator), pressure_file, api.is_simulator
         )
         await api.move_rel(trial.pipette.mount, Point(z=abs(well_top_to_meniscus_mm)))
         print(
@@ -441,7 +449,7 @@ async def _run_trial(
             min_pa=asp_min,
             max_pa=asp_max,
             stable_pa=asp_st_pa,
-            stable_sec=asp_st_sec if asp_st_sec else ASPIRATE_DELAY_SEC,
+            stable_sec=asp_st_sec if asp_st_sec else ASPIRATE_DELAY_SEC_BY_TIP[trial.pipette.tip],
         )
         dispense_results = TrialResults(
             min_pa=disp_min,
