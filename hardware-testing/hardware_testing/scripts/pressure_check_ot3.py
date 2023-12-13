@@ -28,7 +28,7 @@ SLOT_TRASH = 12
 ASPIRATE_DELAY_SEC_BY_TIP = {
     50: 60, 200: 30, 1000: 15  # smaller tips take longer to stabilize
 }
-DISPENSE_DELAY_SEC = 3
+DISPENSE_DELAY_SEC = 10
 
 FLOW_RATE_SAFE = {
     1: {  # 1ch pipette
