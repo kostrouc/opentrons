@@ -2,6 +2,7 @@
 import argparse
 import asyncio
 from dataclasses import dataclass
+from math import ceil
 from pathlib import Path
 from time import time
 from typing import List, Tuple, Any, Optional, Dict
@@ -598,6 +599,10 @@ async def _main(
             api, pipette, file_results, pressure_file, file_segments, iterate_volumes, ignore_fail,
             action="dispense", volumes=aspirate_volumes, flow_rates=dispense_flow_rates,
         )
+    count_tips_used = (len(SLOTS_TIP_RACK) * 96) - len(_available_tips)
+    tip_overhang = count_tips_used % 96
+    count_racks_used = ceil(count_tips_used / 96)
+    print(f"{count_racks_used} racks used (last one has {tip_overhang} tips)")
 
 
 def _find_pressure_file() -> Path:
