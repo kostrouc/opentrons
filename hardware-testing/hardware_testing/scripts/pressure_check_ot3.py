@@ -62,7 +62,7 @@ TEST_ASPIRATE_VOLUME = {
 }
 
 _default_flow_rates = [5, 10, 15, 20, 30, 50]
-_default_flow_rates_p1000 = _default_flow_rates + [100, 200]
+_default_flow_rates_p1000 = _default_flow_rates + [100, 200, 500, 1000]
 
 TEST_FLOW_RATE_ASPIRATE = {
     1: {  # 1ch pipette
@@ -70,7 +70,7 @@ TEST_FLOW_RATE_ASPIRATE = {
         1000: {  # P1000
             50: [1] + _default_flow_rates_p1000,  # 50ul tip
             200: [1] + _default_flow_rates_p1000,  # 200ul tip
-            1000: _default_flow_rates_p1000 + [500],  # 1000ul tip
+            1000: _default_flow_rates_p1000,  # 1000ul tip
         },
     },
     8: {  # 8ch pipette
@@ -78,7 +78,7 @@ TEST_FLOW_RATE_ASPIRATE = {
         1000: {  # P1000
             50: [1] + _default_flow_rates_p1000,  # 50ul tip
             200: [1] + _default_flow_rates_p1000,  # 200ul tip
-            1000: _default_flow_rates_p1000 + [500],  # 1000ul tip
+            1000: _default_flow_rates_p1000,  # 1000ul tip
         },
     },
 }
@@ -478,6 +478,7 @@ async def _test_action(
     file: test_data.File,
     pressure_file: Path,
     file_segments: test_data.File,
+    iterate_volumes: bool,
     action: str,
     volumes: List[int],
     flow_rates: List[int],
@@ -495,6 +496,9 @@ async def _test_action(
         pipette.tip
     ]
     assert len(volumes)
+    if not iterate_volumes:
+        volumes.sort()
+        volumes = volumes[-1:]
 
     extra_commas = "," * len(volumes)
     file.append(f"{action.upper()}")
@@ -543,6 +547,7 @@ async def _reset_hardware(api: OT3API, pipette: PipetteSettings) -> None:
 async def _main(
     pressure_file: Path,
     is_simulating: bool,
+    iterate_volumes: bool,
     skip_aspirate: bool,
     skip_dispense: bool,
     tip: int,
@@ -565,14 +570,18 @@ async def _main(
     file_segments = test_data.create_file(
         test_name=TEST_NAME, tag=f"{pip_serial}-segments", run_id=RUN_ID
     )
+    if len(aspirate_volumes) > 1 and not iterate_volumes:
+        print("WARNING: --aspirate-volumes was used without --iterate-volumes flag, "
+              "so now we will assume you want to iterate over the volumes you passed in")
+        iterate_volumes = True
     if not skip_aspirate:
         await _test_action(
-            api, pipette, file_results, pressure_file, file_segments,
+            api, pipette, file_results, pressure_file, file_segments, iterate_volumes,
             action="aspirate", volumes=aspirate_volumes, flow_rates=aspirate_flow_rates,
         )
     if not skip_dispense:
         await _test_action(
-            api, pipette, file_results, pressure_file, file_segments,
+            api, pipette, file_results, pressure_file, file_segments, iterate_volumes,
             action="dispense", volumes=aspirate_volumes, flow_rates=dispense_flow_rates,
         )
 
@@ -600,6 +609,7 @@ if __name__ == "__main__":
     parser.add_argument("--offset-tip-rack", nargs="+", type=float, default=[0, 0, 0])
     parser.add_argument("--offset-reservoir", nargs="+", type=float, default=[0, 0, 0])
     parser.add_argument("--aspirate-volumes", nargs="+", type=int, default=[])
+    parser.add_argument("--iterate-volumes", action="store_true")
     parser.add_argument("--aspirate-flow-rates", nargs="+", type=int, default=[])
     parser.add_argument("--dispense-flow-rates", nargs="+", type=int, default=[])
     args = parser.parse_args()
@@ -609,6 +619,7 @@ if __name__ == "__main__":
         _main(
             _find_pressure_file(),
             args.simulate,
+            args.iterate_volumes,
             args.skip_aspirate,
             args.skip_dispense,
             args.tip,
