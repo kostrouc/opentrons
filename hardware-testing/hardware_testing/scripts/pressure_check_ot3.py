@@ -32,11 +32,11 @@ DISPENSE_DELAY_SEC = 3
 FLOW_RATE_SAFE = {
     1: {  # 1ch pipette
         50: {50: 5},  # P50  # 50ul tip
-        1000: {50: 5, 200: 15, 1000: 15},  # P1000  # 50ul tip  # 200ul tip  # 1000ul tip
+        1000: {50: 5, 200: 15, 1000: 30},  # P1000  # 50ul tip  # 200ul tip  # 1000ul tip
     },
     8: {  # 8ch pipette
         50: {50: 5},  # P50  # 50ul tip
-        1000: {50: 5, 200: 15, 1000: 15},  # P1000  # 50ul tip  # 200ul tip  # 1000ul tip
+        1000: {50: 5, 200: 15, 1000: 30},  # P1000  # 50ul tip  # 200ul tip  # 1000ul tip
     },
 }
 
@@ -366,8 +366,9 @@ async def _run_trial(
     api: OT3API,
     trial: TrialSettings,
     pressure_file: Path,
-    file_segments: test_data.File
-) -> Tuple[TrialResults, TrialResults]:
+    file_segments: test_data.File,
+    action: str,
+) -> Tuple[TrialResults, TrialResults, bool]:
     await _pick_up_tip(api, trial.pipette, int(trial.pipette.tip))
     await _move_to_meniscus(api, trial.pipette)
     await api.move_rel(trial.pipette.mount, Point(z=-abs(trial.submerge)))
@@ -382,14 +383,14 @@ async def _run_trial(
     press_disp = None
     press_disp_del = None
 
-    def _store_raw_data(seg: PressureSegment, action: str) -> None:
-        if "aspirate" in action:
+    def _store_raw_data(seg: PressureSegment, a: str) -> None:
+        if "aspirate" in a:
             fr = trial.flow_rate["aspirate"]
         else:
             fr = trial.flow_rate["dispense"]
         for s in seg.samples:
             file_segments.append(
-                f"{action},"
+                f"{a},"
                 f"{trial.aspirate_volume},"
                 f"{fr},"
                 f"{s[0]},"
@@ -397,6 +398,7 @@ async def _run_trial(
                 f"{int(s[2])}\n"
             )
 
+    passed = {"aspirate": False, "dispense": False}
     try:
         print(
             f"aspirating {trial.aspirate_volume} uL at {trial.flow_rate['aspirate']} ul/sec"
@@ -411,6 +413,7 @@ async def _run_trial(
         press_asp_del = await _run_coro_and_get_pressure(
             _delay(asp_del_sec, api.is_simulator), pressure_file, api.is_simulator
         )
+        passed["aspirate"] = True
         await api.move_rel(trial.pipette.mount, Point(z=abs(well_top_to_meniscus_mm)))
         print(
             f"dispensing {trial.aspirate_volume} uL at {trial.flow_rate['dispense']} ul/sec"
@@ -422,6 +425,7 @@ async def _run_trial(
         press_disp_del = await _run_coro_and_get_pressure(
             _delay(DISPENSE_DELAY_SEC, api.is_simulator), pressure_file, api.is_simulator
         )
+        passed["dispense"] = True
         await api.retract(trial.pipette.mount)
         await _drop_tip(api, trial.pipette)
     except PipetteOverpressureError as e:
@@ -430,13 +434,13 @@ async def _run_trial(
         await _drop_tip(api, trial.pipette, after_fail=True)
     finally:
         if press_asp:
-            _store_raw_data(press_asp, action="aspirate")
+            _store_raw_data(press_asp, a="aspirate")
         if press_asp_del:
-            _store_raw_data(press_asp_del, action="aspirate-delay")
+            _store_raw_data(press_asp_del, a="aspirate-delay")
         if press_disp:
-            _store_raw_data(press_disp, action="dispense")
+            _store_raw_data(press_disp, a="dispense")
         if press_disp_del:
-            _store_raw_data(press_disp_del, action="dispense-delay")
+            _store_raw_data(press_disp_del, a="dispense-delay")
         asp_min = min(press_asp.min if press_asp else 0, press_asp_del.min if press_asp_del else 0)
         asp_max = max(press_asp.max if press_asp else 0, press_asp_del.max if press_asp_del else 0)
         asp_st_pa = press_asp_del.stable_average if press_asp_del and press_asp_del.stable_average else 0
@@ -457,7 +461,7 @@ async def _run_trial(
             stable_pa=disp_st_pa,
             stable_sec=disp_st_sec if disp_st_sec else DISPENSE_DELAY_SEC,
         )
-    return aspirate_results, dispense_results
+    return aspirate_results, dispense_results, passed[action]
 
 
 def _build_default_trial(pipette: PipetteSettings) -> TrialSettings:
@@ -479,6 +483,7 @@ async def _test_action(
     pressure_file: Path,
     file_segments: test_data.File,
     iterate_volumes: bool,
+    ignore_fail: bool,
     action: str,
     volumes: List[int],
     flow_rates: List[int],
@@ -517,20 +522,26 @@ async def _test_action(
     trial = _build_default_trial(pipette)
     for flow_rate in flow_rates:
         res: List[TrialResults] = []
+        flow_rate_pass = True
         for volume in volumes:
             trial.flow_rate[action] = flow_rate
             trial.aspirate_volume = volume
-            trial_results = await _run_trial(api, trial, pressure_file, file_segments)
+            asp_res, disp_res, vol_pass = await _run_trial(api, trial, pressure_file, file_segments, action)
             if action == "aspirate":
-                res.append(trial_results[0])
+                res.append(asp_res)
             else:
-                res.append(trial_results[1])
+                res.append(disp_res)
+            if not vol_pass:
+                flow_rate_pass = False
         file.append(
             f'{flow_rate},{",".join([str(round(r.min_pa, 1)) for r in res])},'
             f'{flow_rate},{",".join([str(round(r.max_pa, 1)) for r in res])},'
             f'{flow_rate},{",".join([str(round(r.stable_pa, 1)) for r in res])},'
             f'{flow_rate},{",".join([str(round(r.stable_sec, 1)) for r in res])}\n'
         )
+        if not ignore_fail and not flow_rate_pass:
+            print("a trial failed, so not continuing on to other flow-rates")
+            break
 
 
 async def _reset_hardware(api: OT3API, pipette: PipetteSettings) -> None:
@@ -548,6 +559,7 @@ async def _main(
     pressure_file: Path,
     is_simulating: bool,
     iterate_volumes: bool,
+    ignore_fail: bool,
     skip_aspirate: bool,
     skip_dispense: bool,
     tip: int,
@@ -576,12 +588,12 @@ async def _main(
         iterate_volumes = True
     if not skip_aspirate:
         await _test_action(
-            api, pipette, file_results, pressure_file, file_segments, iterate_volumes,
+            api, pipette, file_results, pressure_file, file_segments, iterate_volumes, ignore_fail,
             action="aspirate", volumes=aspirate_volumes, flow_rates=aspirate_flow_rates,
         )
     if not skip_dispense:
         await _test_action(
-            api, pipette, file_results, pressure_file, file_segments, iterate_volumes,
+            api, pipette, file_results, pressure_file, file_segments, iterate_volumes, ignore_fail,
             action="dispense", volumes=aspirate_volumes, flow_rates=dispense_flow_rates,
         )
 
@@ -610,6 +622,7 @@ if __name__ == "__main__":
     parser.add_argument("--offset-reservoir", nargs="+", type=float, default=[0, 0, 0])
     parser.add_argument("--aspirate-volumes", nargs="+", type=int, default=[])
     parser.add_argument("--iterate-volumes", action="store_true")
+    parser.add_argument("--ignore-fail", action="store_true")
     parser.add_argument("--aspirate-flow-rates", nargs="+", type=int, default=[])
     parser.add_argument("--dispense-flow-rates", nargs="+", type=int, default=[])
     args = parser.parse_args()
@@ -620,6 +633,7 @@ if __name__ == "__main__":
             _find_pressure_file(),
             args.simulate,
             args.iterate_volumes,
+            args.ignore_fail,
             args.skip_aspirate,
             args.skip_dispense,
             args.tip,
