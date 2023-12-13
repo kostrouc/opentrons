@@ -1,6 +1,7 @@
 """Pressure-Check OT3."""
 import argparse
 import asyncio
+from datetime import datetime
 from dataclasses import dataclass
 from math import ceil
 from pathlib import Path
@@ -585,6 +586,11 @@ async def _main(
     file_segments = test_data.create_file(
         test_name=TEST_NAME, tag=f"{pip_serial}-segments", run_id=RUN_ID
     )
+    file_info_str = f"pipette={pip_serial}," \
+                    f"tip={tip}," \
+                    f"time={datetime.now().strftime('%H:%M:%S %Z')}"
+    file_results.append(file_info_str)
+    file_segments.append(file_info_str)
     if len(aspirate_volumes) > 1 and not iterate_volumes:
         print("WARNING: --aspirate-volumes was used without --iterate-volumes flag, "
               "so now we will assume you want to iterate over the volumes you passed in")
