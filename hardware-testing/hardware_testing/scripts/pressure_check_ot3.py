@@ -574,6 +574,8 @@ async def _main(
     )
     pipette = PipetteSettings.build(api, tip, offset_tip_rack, offset_reservoir)
     await _reset_hardware(api, pipette)
+    if pipette.channels == 96:
+        raise NotImplementedError("96ch is not yet implemented for this script")
 
     pip_serial = helpers_ot3.get_pipette_serial_ot3(pipette.hw_pipette)
     file_results = test_data.create_file(
