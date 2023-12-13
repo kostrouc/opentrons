@@ -508,7 +508,7 @@ async def _test_action(
         volumes = volumes[-1:]
 
     extra_commas = "," * len(volumes)
-    file.append(f"{action.upper()}")
+    file.append(f"{action.upper()}\n")
     file.append(
         f"MIN Pa,{extra_commas}"
         f"MAX Pa,{extra_commas}"
@@ -572,7 +572,7 @@ async def _main(
     dispense_flow_rates: List[int],
 ) -> None:
     api = await helpers_ot3.build_async_ot3_hardware_api(
-        is_simulating=is_simulating, pipette_left="p1000_multi_v3.5"
+        is_simulating=is_simulating, pipette_left="p50_multi_v3.5"
     )
     pipette = PipetteSettings.build(api, tip, offset_tip_rack, offset_reservoir)
     await _reset_hardware(api, pipette)
@@ -588,7 +588,7 @@ async def _main(
     )
     file_info_str = f"pipette={pip_serial}," \
                     f"tip={tip}," \
-                    f"time={datetime.now().strftime('%H:%M:%S %Z')}"
+                    f"time={datetime.now().strftime('%H:%M:%S %Z')}\n"
     file_results.append(file_info_str)
     file_segments.append(file_info_str)
     if len(aspirate_volumes) > 1 and not iterate_volumes:
