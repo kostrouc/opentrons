@@ -530,12 +530,13 @@ class SensorScheduler:
                 isinstance(message, ErrorMessage)
                 and message.payload.error_code.value == ErrorCode.over_pressure.value
             ):
-                error_response_queue.put_nowait(
-                    (
-                        NodeId(arb_id.parts.originating_node_id),
-                        ErrorCode(message.payload.error_code.value),
-                    )
-                )
+                print("ignoring over-pressure error")
+                # error_response_queue.put_nowait(
+                #     (
+                #         NodeId(arb_id.parts.originating_node_id),
+                #         ErrorCode(message.payload.error_code.value),
+                #     )
+                # )
 
         def _filter(arbitration_id: ArbitrationId) -> bool:
             node_id_match = any(
