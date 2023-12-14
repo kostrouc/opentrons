@@ -554,9 +554,10 @@ class SensorScheduler:
                     payload=BindSensorOutputRequestPayload(
                         sensor=SensorTypeField(sensor.sensor_type),
                         sensor_id=SensorIdField(sensor.sensor_id),
-                        binding=SensorOutputBindingField(
-                            SensorOutputBinding.max_threshold_sync.value
-                        ),
+                        # binding=SensorOutputBindingField(
+                        #     SensorOutputBinding.max_threshold_sync.value
+                        # ),
+                        binding=SensorOutputBindingField(SensorOutputBinding.none.value),
                     )
                 ),
                 expected_nodes=[sensor.node_id],
