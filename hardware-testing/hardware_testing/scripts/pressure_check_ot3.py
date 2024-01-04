@@ -645,10 +645,13 @@ if __name__ == "__main__":
     parser.add_argument("--ignore-fail", action="store_true")
     parser.add_argument("--aspirate-flow-rates", nargs="+", type=int, default=[])
     parser.add_argument("--dispense-flow-rates", nargs="+", type=int, default=[])
-    parser.add_argument("--tip-rack-slots", nargs="+", type=int, default=[])
+    parser.add_argument("--tip-rack-slots", nargs="+", type=int, default=DEFAULT_SLOTS_TIP_RACK)
+    parser.add_argument("--well-top-to-meniscus-mm", type=float, default=0.0)
     args = parser.parse_args()
     assert len(args.offset_tip_rack) == 3
     assert len(args.offset_reservoir) == 3
+    well_top_to_meniscus_mm += args.well_top_to_meniscus_mm
+    assert well_top_to_meniscus_mm <= 0.0
     asyncio.run(
         _main(
             _find_pressure_file(),
