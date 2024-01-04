@@ -22,8 +22,8 @@ from hardware_testing.opentrons_api import helpers_ot3
 
 TEST_NAME = "pressure-check-ot3"
 
-SLOTS_TIP_RACK = [2, 5, 6, 7, 8, 9, 10, 11]
-SLOT_RESERVOIR = 3
+DEFAULT_SLOTS_TIP_RACK = [5]
+SLOT_RESERVOIR = 2
 SLOT_TRASH = 12
 
 ASPIRATE_DELAY_SEC_BY_TIP = {
@@ -91,7 +91,7 @@ TEST_FLOW_RATE_DISPENSE = {
         1000: {  # P1000
             50: [1] + _default_flow_rates_p1000,  # 50ul tip
             200: [1] + _default_flow_rates_p1000,  # 200ul tip
-            1000: _default_flow_rates_p1000 + [500],  # 1000ul tip
+            1000: _default_flow_rates_p1000,  # 1000ul tip
         },
     },
     8: {  # 8ch pipette
@@ -99,7 +99,7 @@ TEST_FLOW_RATE_DISPENSE = {
         1000: {  # P1000
             50: [1] + _default_flow_rates_p1000,  # 50ul tip
             200: [1] + _default_flow_rates_p1000,  # 200ul tip
-            1000: _default_flow_rates_p1000 + [500],  # 1000ul tip
+            1000: _default_flow_rates_p1000,  # 1000ul tip
         },
     },
 }
@@ -121,12 +121,7 @@ def _tip_position(slot: int, well: str) -> Point:
     return _rack_a1 + Point(x=x, y=y, z=0)
 
 
-_available_tips: List[Point] = [
-    _tip_position(slot, f"{row}{col}")
-    for slot in SLOTS_TIP_RACK
-    for col in range(1, 13)
-    for row in "ABCDEFGH"
-]
+_available_tips: List[Point] = []
 
 trash_nominal = helpers_ot3.get_slot_calibration_square_position_ot3(
     SLOT_TRASH
@@ -270,6 +265,9 @@ async def _drop_tip(
         loc = trash_nominal + pipette.center_offset
         await helpers_ot3.move_to_arched_ot3(api, pipette.mount, loc)
         await api.drop_tip(pipette.mount)
+        for _ in range(3):
+            await api.add_tip(pipette.mount, 1)
+            await api.drop_tip(pipette.mount)
         _tip_state = await api.get_tip_presence_status(pipette.mount)
         assert _tip_state == types.TipStateType.ABSENT, "tip still detected"
 
@@ -570,7 +568,9 @@ async def _main(
     aspirate_volumes: List[int],
     aspirate_flow_rates: List[int],
     dispense_flow_rates: List[int],
+    tip_rack_slots: List[int],
 ) -> None:
+    global _available_tips
     api = await helpers_ot3.build_async_ot3_hardware_api(
         is_simulating=is_simulating, pipette_left="p50_multi_v3.5"
     )
@@ -595,6 +595,12 @@ async def _main(
         print("WARNING: --aspirate-volumes was used without --iterate-volumes flag, "
               "so now we will assume you want to iterate over the volumes you passed in")
         iterate_volumes = True
+    if not tip_rack_slots:
+        tip_rack_slots = DEFAULT_SLOTS_TIP_RACK
+    for slot in tip_rack_slots:
+        for col in range(1, 13):
+            for row in "ABCDEFGH":
+                _available_tips.append(_tip_position(slot, f"{row}{col}"))
     if not skip_aspirate:
         await _test_action(
             api, pipette, file_results, pressure_file, file_segments, iterate_volumes, ignore_fail,
@@ -605,7 +611,8 @@ async def _main(
             api, pipette, file_results, pressure_file, file_segments, iterate_volumes, ignore_fail,
             action="dispense", volumes=aspirate_volumes, flow_rates=dispense_flow_rates,
         )
-    count_tips_used = (len(SLOTS_TIP_RACK) * 96) - len(_available_tips)
+    # check in simulation how many tips we have, so we are prepared when running in real life
+    count_tips_used = (len(tip_rack_slots) * 96) - len(_available_tips)
     tip_overhang = count_tips_used % 96
     count_racks_used = ceil(count_tips_used / 96)
     print(f"{count_racks_used} racks used (last one has {tip_overhang} tips)")
@@ -638,6 +645,7 @@ if __name__ == "__main__":
     parser.add_argument("--ignore-fail", action="store_true")
     parser.add_argument("--aspirate-flow-rates", nargs="+", type=int, default=[])
     parser.add_argument("--dispense-flow-rates", nargs="+", type=int, default=[])
+    parser.add_argument("--tip-rack-slots", nargs="+", type=int, default=[])
     args = parser.parse_args()
     assert len(args.offset_tip_rack) == 3
     assert len(args.offset_reservoir) == 3
@@ -654,6 +662,7 @@ if __name__ == "__main__":
             Point(*args.offset_reservoir),
             args.aspirate_volumes,
             args.aspirate_flow_rates,
-            args.dispense_flow_rates
+            args.dispense_flow_rates,
+            args.tip_rack_slots
         )
     )
