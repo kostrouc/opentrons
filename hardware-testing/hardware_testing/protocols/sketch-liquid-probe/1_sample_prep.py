@@ -35,15 +35,17 @@ def run(ctx: ProtocolContext) -> None:
 
     # use 8ch to confirm water is present
     with new_tip(multi):
-        multi.confirm_liquid(reservoir["A1"], tolerance_ul=[-500, 2000])
+        multi.confirm_liquid_volume(reservoir["A1"], tolerance_ul=[-500, 2000])
 
     #################################################
     #       SEARCH FOR UNKNOWN LIQUID VOLUMES       #
     #################################################
 
+    # NOTE: there is something there, we just don't know how much
+    # NOTE: each volume found will be saved/tracked internally
     for tube in tuberack.wells():
         with new_tip(single):
-            single.find_liquid_volume(tube)  # NOTE: there is something there, we just don't know how much
+            single.find_liquid_volume(tube)
 
     #########################################
     #       SPREAD WATER ACROSS PLATE       #
@@ -53,10 +55,8 @@ def run(ctx: ProtocolContext) -> None:
         for plate_column in range(12):
             src_well = reservoir["A1"]
             dst_well = plate[f"A{plate_column + 1}"]
-            src_loc = src_well.liquid.after_aspirate(ul=50).top(-2)
-            dst_loc = dst_well.liquid.after_dispense(ul=50).top(-2)
-            multi.aspirate(volume=199, location=src_loc, z_tracking=True)
-            multi.dispense(volume=199, location=dst_loc, z_tracking=True)
+            multi.aspirate(volume=199, location=src_well, z_tracking=-2)
+            multi.dispense(volume=199, location=dst_well, z_tracking=-2)
 
     #########################################
     #       TRANSFER 1uL TO EACH WELL       #
@@ -67,5 +67,5 @@ def run(ctx: ProtocolContext) -> None:
             src_well = reservoir["A12"]
             src_loc = src_well.liquid.after_aspirate(ul=1).top(-2)
             dst_loc = dst_well.liquid.after_dispense(ul=1).top(-2)
-            single.aspirate(volume=1, location=src_loc, z_tracking=True)
-            single.dispense(volume=1, location=dst_loc, z_tracking=True)
+            single.aspirate(volume=1, location=src_loc)
+            single.dispense(volume=1, location=dst_loc)

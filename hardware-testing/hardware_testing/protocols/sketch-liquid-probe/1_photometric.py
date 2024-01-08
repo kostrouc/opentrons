@@ -34,13 +34,13 @@ def run(ctx: ProtocolContext) -> None:
 
     # use 8ch to confirm diluent is present
     with new_tip(multi):
-        multi.confirm_liquid(reservoir["A1"], tolerance_ul=[-500, 2000])
+        multi.confirm_liquid_volume(reservoir["A1"], tolerance_ul=[-500, 2000])
     with new_tip(multi):
-        multi.confirm_liquid(reservoir["A2"], tolerance_ul=[-500, 2000])
+        multi.confirm_liquid_volume(reservoir["A2"], tolerance_ul=[-500, 2000])
 
     # use 1ch to confirm dye is present
     with new_tip(single):
-        single.confirm_liquid(reservoir["A12"], tolerance_ul=[-500, 2000])
+        single.confirm_liquid_volume(reservoir["A12"], tolerance_ul=[-500, 2000])
 
     ###########################################
     #       SPREAD DILUENT ACROSS PLATE       #
@@ -50,10 +50,8 @@ def run(ctx: ProtocolContext) -> None:
         for plate_column in range(12):
             src_well = reservoir["A1" if plate_column < 6 else "A2"]
             dst_well = plate[f"A{plate_column + 1}"]
-            src_loc = src_well.liquid.after_aspirate(ul=199).top(-2)
-            dst_loc = dst_well.liquid.after_dispense(ul=199).top(-2)
-            multi.aspirate(volume=199, location=src_loc, z_tracking=True)
-            multi.dispense(volume=199, location=dst_loc, z_tracking=True)
+            multi.aspirate(volume=199, location=src_well, z_tracking=-2)  # stay 2mm below meniscus
+            multi.dispense(volume=199, location=dst_well.liquid, z_tracking=-2)  # allow liquid as an argument
 
     #########################################
     #       TRANSFER 1uL TO EACH WELL       #
