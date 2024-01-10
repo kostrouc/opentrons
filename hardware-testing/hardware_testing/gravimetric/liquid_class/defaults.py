@@ -21,7 +21,7 @@ _default_accel_p50_ul_sec_sec = 1200
 _default_accel_p1000_ul_sec_sec = 24000
 _default_accel_96ch_ul_sec_sec = 16000
 
-_MULTI_DISPENSE_P50_FLOW_RATE = 20  # TODO: delete this
+_MULTI_DISPENSE_P50_FLOW_RATE = 5  # TODO: delete this
 _MULTI_DISPENSE_P1000_FLOW_RATE = 200  # TODO: delete this
 
 # dispense settings are constant across volumes
