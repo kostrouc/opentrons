@@ -21,6 +21,7 @@ import {
 } from '@opentrons/components'
 import {
   FLEX_ROBOT_TYPE,
+  getCutoutIdForSlotName,
   getDeckDefFromRobotType,
   getModuleType,
   HEATERSHAKER_MODULE_TYPE,
@@ -35,7 +36,6 @@ import { TertiaryButton } from '../../../../atoms/buttons'
 import { StatusLabel } from '../../../../atoms/StatusLabel'
 import { StyledText } from '../../../../atoms/text'
 import { Tooltip } from '../../../../atoms/Tooltip'
-import { getCutoutIdForSlotName } from '../../../../resources/deck_configuration/utils'
 import { useChainLiveCommands } from '../../../../resources/runs/hooks'
 import { ModuleSetupModal } from '../../../ModuleCard/ModuleSetupModal'
 import { ModuleWizardFlows } from '../../../ModuleWizardFlows'
@@ -216,7 +216,7 @@ interface ModulesListItemProps {
   isFlex: boolean
   calibrationStatus: ProtocolCalibrationStatus
   deckDef: DeckDefinition
-  conflictedFixture?: CutoutConfig
+  conflictedFixture: CutoutConfig | null
 }
 
 export function ModulesListItem({
@@ -366,7 +366,6 @@ export function ModulesListItem({
       {showLocationConflictModal && cutoutIdForSlotName != null ? (
         <LocationConflictModal
           onCloseClick={() => setShowLocationConflictModal(false)}
-          // TODO(bh, 2023-10-10): when module caddies are fixtures, narrow slotName to Cutout and remove type assertion
           cutoutId={cutoutIdForSlotName}
           requiredModule={moduleModel}
         />
@@ -443,7 +442,7 @@ export function ModulesListItem({
                   onClick={() => setShowLocationConflictModal(true)}
                 >
                   <StyledText as="label" cursor="pointer">
-                    {t('update_deck')}
+                    {t('resolve')}
                   </StyledText>
                 </TertiaryButton>
               </Flex>

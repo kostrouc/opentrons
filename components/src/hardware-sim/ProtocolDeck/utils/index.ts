@@ -1,2 +1,2 @@
-export * from './getSimplestFlexDeckConfig'
+export * from './getLabwareInSlots'
 export * from './getStandardDeckViewLayerBlockList'

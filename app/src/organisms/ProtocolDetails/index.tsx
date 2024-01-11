@@ -39,7 +39,10 @@ import {
   parseInitialLoadedLabwareByModuleId,
   parseInitialLoadedLabwareByAdapter,
 } from '@opentrons/api-client'
-import { getGripperDisplayName } from '@opentrons/shared-data'
+import {
+  getGripperDisplayName,
+  getSimplestDeckConfigForProtocol,
+} from '@opentrons/shared-data'
 
 import { Portal } from '../../App/portal'
 import { Divider } from '../../atoms/structure'
@@ -54,9 +57,8 @@ import {
   analyzeProtocol,
 } from '../../redux/protocol-storage'
 import { useFeatureFlag } from '../../redux/config'
-import { getSimplestDeckConfigForProtocolCommands } from '../../resources/deck_configuration/utils'
 import { ChooseRobotToRunProtocolSlideout } from '../ChooseRobotToRunProtocolSlideout'
-import { SendProtocolToOT3Slideout } from '../SendProtocolToOT3Slideout'
+import { SendProtocolToFlexSlideout } from '../SendProtocolToFlexSlideout'
 import { ProtocolAnalysisFailure } from '../ProtocolAnalysisFailure'
 import {
   getAnalysisStatus,
@@ -198,8 +200,8 @@ export function ProtocolDetails(
     setShowChooseRobotToRunProtocolSlideout,
   ] = React.useState<boolean>(false)
   const [
-    showSendProtocolToOT3Slideout,
-    setShowSendProtocolToOT3Slideout,
+    showSendProtocolToFlexSlideout,
+    setShowSendProtocolToFlexSlideout,
   ] = React.useState<boolean>(false)
   const [showDeckViewModal, setShowDeckViewModal] = React.useState(false)
 
@@ -230,8 +232,8 @@ export function ProtocolDetails(
       ? map(parseInitialLoadedModulesBySlot(mostRecentAnalysis.commands))
       : []
 
-  const requiredFixtureDetails = getSimplestDeckConfigForProtocolCommands(
-    mostRecentAnalysis?.commands ?? []
+  const requiredFixtureDetails = getSimplestDeckConfigForProtocol(
+    mostRecentAnalysis
   )
 
   const requiredLabwareDetails =
@@ -377,9 +379,9 @@ export function ProtocolDetails(
             showSlideout={showChooseRobotToRunProtocolSlideout}
             storedProtocolData={props}
           />
-          <SendProtocolToOT3Slideout
-            isExpanded={showSendProtocolToOT3Slideout}
-            onCloseClick={() => setShowSendProtocolToOT3Slideout(false)}
+          <SendProtocolToFlexSlideout
+            isExpanded={showSendProtocolToFlexSlideout}
+            onCloseClick={() => setShowSendProtocolToFlexSlideout(false)}
             storedProtocolData={props}
           />
 
@@ -516,8 +518,8 @@ export function ProtocolDetails(
                 handleRunProtocol={() =>
                   setShowChooseRobotToRunProtocolSlideout(true)
                 }
-                handleSendProtocolToOT3={() =>
-                  setShowSendProtocolToOT3Slideout(true)
+                handleSendProtocolToFlex={() =>
+                  setShowSendProtocolToFlexSlideout(true)
                 }
                 storedProtocolData={props}
                 data-testid="ProtocolDetails_overFlowMenu"
@@ -527,6 +529,7 @@ export function ProtocolDetails(
           <Flex
             flexDirection={DIRECTION_ROW}
             justifyContent={JUSTIFY_SPACE_BETWEEN}
+            marginBottom={SPACING.spacing16}
           >
             <Flex
               flex={`0 0 ${String(SIZE_5)}`}

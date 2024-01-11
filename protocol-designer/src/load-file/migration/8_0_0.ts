@@ -14,6 +14,7 @@ import type {
 import type {
   CommandAnnotationV1Mixin,
   CommandV8Mixin,
+  CreateCommand as CreateCommandV8,
   LabwareV2Mixin,
   LiquidV1Mixin,
   LoadPipetteCreateCommand,
@@ -22,6 +23,7 @@ import type {
   ProtocolBase,
   ProtocolFile,
 } from '@opentrons/shared-data/protocol/types/schemaV8'
+import type { CreateCommand as CreateCommandV7 } from '@opentrons/shared-data/protocol/types/schemaV7'
 import type { DesignerApplicationData } from './utils/getLoadLiquidCommands'
 
 // NOTE: this migration is to schema v8 and updates fixed trash by
@@ -62,9 +64,24 @@ export const migrateFile = (
       params: {
         addressableAreaName: trashAddressableArea,
         pipetteId: pipetteId ?? '',
+        offset: { x: 0, y: 0, z: 0 },
       },
     },
   ]
+
+  const migrateCommands = (
+    v7Commands: CreateCommandV7[]
+  ): CreateCommandV8[] => {
+    return v7Commands.filter(
+      v7Command =>
+        !(
+          v7Command.commandType === 'loadLabware' &&
+          v7Command.params.labwareId === 'fixedTrash'
+        )
+    )
+  }
+
+  const migratedV7Commands = migrateCommands(commands)
 
   const newLabwareLocationUpdate: LabwareLocationUpdate = Object.keys(
     labwareLocationUpdate
@@ -74,7 +91,6 @@ export const migrateFile = (
     }
     return acc
   }, {})
-
   const migrateSavedStepForms = (
     savedStepForms: Record<string, any>
   ): Record<string, any> => {
@@ -90,9 +106,10 @@ export const migrateFile = (
       if (stepForm.stepType === 'moveLiquid') {
         return {
           ...stepForm,
+          nozzles: null,
           aspirate_labware:
             stepForm.aspirate_labware === 'fixedTrash'
-              ? trashId
+              ? null
               : stepForm.aspirate_labware,
           dispense_labware:
             stepForm.dispense_labware === 'fixedTrash'
@@ -103,8 +120,8 @@ export const migrateFile = (
       } else if (stepForm.stepType === 'mix') {
         return {
           ...stepForm,
-          labware:
-            stepForm.labware === 'fixedTrash' ? trashId : stepForm.labware,
+          nozzles: null,
+          labware: stepForm.labware === 'fixedTrash' ? null : stepForm.labware,
           ...sharedParams,
         }
       }
@@ -177,7 +194,7 @@ export const migrateFile = (
 
   const commandv8Mixin: CommandV8Mixin = {
     commandSchemaId: 'opentronsCommandSchemaV8',
-    commands: [...commands, ...trashMoveToAddressableAreaCommand],
+    commands: [...migratedV7Commands, ...trashMoveToAddressableAreaCommand],
   }
 
   const commandAnnotionaV1Mixin: CommandAnnotationV1Mixin = {

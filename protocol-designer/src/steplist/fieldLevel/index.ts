@@ -152,7 +152,8 @@ const getLabwareLocation = (
     return {
       addressableAreaName: isWasteChuteLocation
         ? 'gripperWasteChute'
-        : newLocationString,
+        : // TODO(bh, 2024-01-02): check new location against addressable areas via the deck definition
+          (newLocationString as AddressableAreaName),
     }
   } else {
     return { slotName: newLocationString }
@@ -232,7 +233,7 @@ const stepFieldHelperMap: Record<StepFieldName, StepFieldHelpers> = {
     castValue: Number,
   },
   dispense_wells: {
-    getErrors: composeErrors(requiredField, minimumWellCount(1)),
+    getErrors: composeErrors(requiredField, minimumWellCount(0)),
     maskValue: defaultTo([]),
   },
   disposalVolume_volume: {

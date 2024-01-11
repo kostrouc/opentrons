@@ -38,7 +38,7 @@ export function DeckConfigurator(props: DeckConfiguratorProps): JSX.Element {
     handleClickAdd,
     handleClickRemove,
     lightFill = COLORS.light1,
-    darkFill = COLORS.darkGreyEnabled,
+    darkFill = COLORS.darkBlackEnabled,
     readOnly = false,
     showExpansion = true,
     children,
@@ -144,7 +144,10 @@ export function DeckConfigurator(props: DeckConfiguratorProps): JSX.Element {
       <SlotLabels
         robotType={FLEX_ROBOT_TYPE}
         color={darkFill}
-        show4thColumn={stagingAreaFixtures.length > 0}
+        show4thColumn={
+          stagingAreaFixtures.length > 0 ||
+          wasteChuteStagingAreaFixtures.length > 0
+        }
       />
       {children}
     </RobotCoordinateSpace>
