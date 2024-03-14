@@ -166,15 +166,14 @@ async def ui_task(can_driver: AbstractCanDriver) -> None:
 
     Returns: None.
     """
-    while True:
-        try:
-            # Run sync prompt message in threadpool executor.
-            sensor_command, to_csv = await asyncio.get_event_loop().run_in_executor(
-                None, prompt_message, input, print
-            )
-            await send_sensor_command(can_driver, sensor_command, to_csv)
-        except InvalidInput as e:
-            print(str(e))
+    try:
+        # Run sync prompt message in threadpool executor.
+        sensor_command, to_csv = await asyncio.get_event_loop().run_in_executor(
+            None, prompt_message, input, print
+        )
+        await send_sensor_command(can_driver, sensor_command, to_csv)
+    except InvalidInput as e:
+        print(str(e))
 
 
 async def run(args: argparse.Namespace) -> None:
