@@ -1,4 +1,5 @@
 """Helper functions for the sensor scripts."""
+from asyncio import sleep
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -202,7 +203,8 @@ async def handle_environment_sensor(
                     }
                 )
         else:
-            log.info(f"Capacitive data not found at: {curr_time}")
+            log.info(f"Environment data not found at: {curr_time}")
+        await sleep(1)
     end_time_log = datetime.now().strftime(hms)
     text_end_time = f"Test ended at: {end_time_log}"
     log.info(text_end_time)
