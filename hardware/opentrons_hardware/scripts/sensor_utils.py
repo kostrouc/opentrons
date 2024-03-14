@@ -173,6 +173,7 @@ async def handle_environment_sensor(
 ) -> None:
     """Function to read data from the environment sensor."""
     start_time = datetime.now()
+    print(f"start time: {start_time.strftime(hms)}")
     csv = None
     environment = sensor_types.EnvironmentSensor.build(SensorId.S0, node_id)
     s_driver = sensor_driver.SensorDriver()
