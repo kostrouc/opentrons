@@ -193,8 +193,7 @@ async def handle_environment_sensor(
         data = await s_driver.read(messenger, environment, offset=False, timeout=10)
         curr_time = datetime.now().strftime(hms)
         if isinstance(data, EnvironmentSensorDataType):
-            log.info(f"Humidity data: {data.humidity.to_float()} at: {curr_time}")
-            log.info(f"Temperature data: {data.temperature.to_float()} at: {curr_time}")
+            print(f"{data.temperature.to_float()}")
             if csv:
                 csv.write_dict(
                     {
