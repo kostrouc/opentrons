@@ -16,7 +16,7 @@
     "distance": 29.8
   },
   "plungerMotorConfigurations": {
-    "idle": 0.3,
+    "idle": 1.0,
     "run": 0.8
   },
   "plungerPositionsConfigurations": {

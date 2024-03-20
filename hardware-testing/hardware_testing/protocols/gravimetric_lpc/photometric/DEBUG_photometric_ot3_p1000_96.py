@@ -4,7 +4,7 @@ from opentrons.protocol_api import ProtocolContext
 metadata = {"protocolName": "DEBUG-photometric-ot3-p1000-96"}
 requirements = {"robotType": "Flex", "apiLevel": "2.15"}
 
-TEST_VOLUME = 0.5
+TEST_VOLUME = 5.0
 ASPIRATE_HEIGHT_FROM_BOTTOM = 1
 DISPENSE_HEIGHT_FROM_BOTTOM = 6
 
@@ -44,6 +44,7 @@ def run(ctx: ProtocolContext) -> None:
     pipette.flow_rate.dispense = FLOW_RATE["dispense"]
 
     for rack in tipracks:
+        ctx.pause("ready to fill another plate")
         pipette.pick_up_tip(rack["A1"])
 
         # ASPIRATE
@@ -54,11 +55,11 @@ def run(ctx: ProtocolContext) -> None:
 
         # DISPENSE
         if AIR_GAP:
-            pipette.dispense(AIR_GAP, plate["A1"].top(), push_out=PUSH_OUT)
+            pipette.dispense(AIR_GAP, plate["A1"].top())
         disp_pos = plate["A1"].bottom(DISPENSE_HEIGHT_FROM_BOTTOM)
         pipette.dispense(pipette.current_volume, disp_pos, push_out=PUSH_OUT)
         ctx.delay(seconds=0.5)
         pipette.touch_tip(speed=30)
         pipette.blow_out()
 
-        pipette.drop_tip()
+        pipette.return_tip()
