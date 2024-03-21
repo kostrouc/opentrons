@@ -1694,7 +1694,7 @@ class OT3API(
         )
         pip_ax = Axis.of_main_tool_actuator(checked_mount)
         # speed depends on if there is a tip, and which direction to move
-        if instrument.has_tip:
+        if instrument.has_tip and False:
             # using slower aspirate flow-rate, to avoid pulling droplets up
             speed_up = self._pipette_handler.plunger_speed(
                 instrument, instrument.aspirate_flow_rate, "aspirate"
@@ -1710,8 +1710,10 @@ class OT3API(
             speed_down = speed_up
         # IMPORTANT: Here is our backlash compensation.
         #            The plunger is pre-loaded in the "aspirate" direction
-        backlash_pos = target_pos.copy()
-        backlash_pos[pip_ax] += instrument.backlash_distance
+        backlash_pos_above = target_pos.copy()
+        backlash_pos_above[pip_ax] -= instrument.backlash_distance
+        backlash_pos_below = target_pos.copy()
+        backlash_pos_below[pip_ax] += instrument.backlash_distance
         # NOTE: plunger position (mm) decreases up towards homing switch
         # NOTE: if already at BOTTOM, we still need to run backlash-compensation movement,
         #       because we do not know if we arrived at BOTTOM from above or below.
@@ -1720,9 +1722,15 @@ class OT3API(
                 pip_ax: instrument.config.plunger_homing_configurations.current
             }
         ):
-            if self._current_position[pip_ax] < backlash_pos[pip_ax]:
+            if self._current_position[pip_ax] > backlash_pos_above[pip_ax]:
                 await self._move(
-                    backlash_pos,
+                    backlash_pos_above,
+                    speed=(speed_up * rate),
+                    acquire_lock=acquire_lock,
+                )
+            if self._current_position[pip_ax] < backlash_pos_below[pip_ax]:
+                await self._move(
+                    backlash_pos_below,
                     speed=(speed_down * rate),
                     acquire_lock=acquire_lock,
                 )
