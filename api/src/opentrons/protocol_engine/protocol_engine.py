@@ -2,6 +2,12 @@
 from contextlib import AsyncExitStack
 from logging import getLogger
 from typing import Dict, Optional, Union
+from opentrons.protocol_engine.actions.actions import ResumeFromRecoveryAction
+from opentrons.protocol_engine.error_recovery_policy import (
+    ErrorRecoveryPolicy,
+    ErrorRecoveryType,
+    error_recovery_by_ff,
+)
 
 from opentrons.protocols.models import LabwareDefinition
 from opentrons.hardware_control import HardwareControlAPI
@@ -25,6 +31,7 @@ from .types import (
     HexColor,
     PostRunHardwareState,
     DeckConfigurationType,
+    AddressableAreaLocation,
 )
 from .execution import (
     QueueWorker,
@@ -46,6 +53,7 @@ from .actions import (
     AddLabwareOffsetAction,
     AddLabwareDefinitionAction,
     AddLiquidAction,
+    AddAddressableAreaAction,
     AddModuleAction,
     HardwareStoppedAction,
     ResetTipsAction,
@@ -87,6 +95,7 @@ class ProtocolEngine:
         hardware_stopper: Optional[HardwareStopper] = None,
         door_watcher: Optional[DoorWatcher] = None,
         module_data_provider: Optional[ModuleDataProvider] = None,
+        error_recovery_policy: ErrorRecoveryPolicy = error_recovery_by_ff,
     ) -> None:
         """Initialize a ProtocolEngine instance.
 
@@ -110,6 +119,7 @@ class ProtocolEngine:
             hardware_api=hardware_api,
             state_store=self._state_store,
             action_dispatcher=self._action_dispatcher,
+            error_recovery_policy=error_recovery_policy,
         )
         self._hardware_stopper = hardware_stopper or HardwareStopper(
             hardware_api=hardware_api,
@@ -156,6 +166,13 @@ class ProtocolEngine:
         )
         self._action_dispatcher.dispatch(action)
         self._hardware_api.pause(HardwarePauseType.PAUSE)
+
+    def resume_from_recovery(self) -> None:
+        """Resume normal protocol execution after the engine was `AWAITING_RECOVERY`."""
+        action = self._state_store.commands.validate_action_allowed(
+            ResumeFromRecoveryAction()
+        )
+        self._action_dispatcher.dispatch(action)
 
     def add_command(self, request: commands.CommandCreate) -> commands.Command:
         """Add a command to the `ProtocolEngine`'s queue.
@@ -239,7 +256,7 @@ class ProtocolEngine:
         if self._state_store.commands.get_is_stopped():
             return
         current_id = (
-            self._state_store.commands.state.running_command_id
+            self._state_store.commands.get_running_command_id()
             or self._state_store.commands.state.queued_command_ids.head(None)
         )
 
@@ -249,6 +266,7 @@ class ProtocolEngine:
                 error_id=self._model_utils.generate_id(),
                 failed_at=self._model_utils.get_timestamp(),
                 error=EStopActivatedError(message="Estop Activated"),
+                type=ErrorRecoveryType.FAIL_RUN,
             )
             self._action_dispatcher.dispatch(fail_action)
 
@@ -261,6 +279,7 @@ class ProtocolEngine:
                     error_id=self._model_utils.generate_id(),
                     failed_at=self._model_utils.get_timestamp(),
                     error=EStopActivatedError(message="Estop Activated"),
+                    type=ErrorRecoveryType.FAIL_RUN,
                 )
                 self._action_dispatcher.dispatch(fail_action)
             self._queue_worker.cancel()
@@ -306,12 +325,12 @@ class ProtocolEngine:
     async def wait_until_complete(self) -> None:
         """Wait until there are no more commands to execute.
 
-        Raises:
-            CommandExecutionFailedError: if any protocol command failed.
+        If a command encountered a fatal error, it's raised as an exception.
         """
         await self._state_store.wait_for(
             condition=self._state_store.commands.get_all_commands_final
         )
+        self._state_store.commands.raise_fatal_command_error()
 
     async def finish(
         self,
@@ -480,6 +499,13 @@ class ProtocolEngine:
 
         self._action_dispatcher.dispatch(AddLiquidAction(liquid=liquid))
         return liquid
+
+    def add_addressable_area(self, addressable_area_name: str) -> None:
+        """Add an addressable area to state."""
+        area = AddressableAreaLocation(addressableAreaName=addressable_area_name)
+        self._action_dispatcher.dispatch(
+            AddAddressableAreaAction(addressable_area=area)
+        )
 
     def reset_tips(self, labware_id: str) -> None:
         """Reset the tip state of a given labware."""

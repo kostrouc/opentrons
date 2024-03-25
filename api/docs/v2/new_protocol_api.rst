@@ -14,7 +14,7 @@ Protocols
 
 .. autoclass:: opentrons.protocol_api.ProtocolContext
    :members:
-   :exclude-members: location_cache, cleanup, clear_commands
+   :exclude-members: location_cache, cleanup, clear_commands, params
 
 Instruments
 ===========
@@ -29,6 +29,14 @@ Labware
 .. autoclass:: opentrons.protocol_api.Labware
    :members:
    :exclude-members: next_tip, use_tips, previous_tip, return_tips
+
+..
+   The trailing ()s at the end of TrashBin and WasteChute here hide the __init__()
+   signatures, since users should never construct these directly.
+
+.. autoclass:: opentrons.protocol_api.TrashBin()
+
+.. autoclass:: opentrons.protocol_api.WasteChute()
 
 Wells and Liquids
 =================

@@ -5,11 +5,12 @@ from datetime import datetime
 from enum import Enum
 from dataclasses import dataclass
 from pydantic import BaseModel, Field, validator
-from typing import Optional, Union, List, Dict, Any, NamedTuple, Tuple
+from typing import Optional, Union, List, Dict, Any, NamedTuple, Tuple, FrozenSet
 from typing_extensions import Literal, TypeGuard
 
 from opentrons_shared_data.pipette.dev_types import PipetteNameType
-from opentrons.types import MountType, DeckSlotName, Point
+from opentrons.types import MountType, DeckSlotName, StagingSlotName
+from opentrons.hardware_control.types import TipStateType as HwTipStateType
 from opentrons.hardware_control.modules import (
     ModuleType as ModuleType,
 )
@@ -34,6 +35,14 @@ class EngineStatus(str, Enum):
     FAILED = "failed"
     SUCCEEDED = "succeeded"
 
+    AWAITING_RECOVERY = "awaiting-recovery"
+    """The engine is waiting for external input to recover from a nonfatal error.
+
+    New fixup commands may be enqueued, which will run immediately.
+    The run can't be paused in this state, but it can be canceled, or resumed from the
+    next protocol command if recovery is complete.
+    """
+
 
 class DeckSlotLocation(BaseModel):
     """The location of something placed in a single deck slot."""
@@ -51,6 +60,20 @@ class DeckSlotLocation(BaseModel):
             " It will automatically be converted to match the robot."
             "\n\n"
             "When one of these values is returned, it will always match the robot."
+        ),
+    )
+
+
+class StagingSlotLocation(BaseModel):
+    """The location of something placed in a single staging slot."""
+
+    slotName: StagingSlotName = Field(
+        ...,
+        description=(
+            # This description should be kept in sync with LabwareOffsetLocation.slotName.
+            "A slot on the robot's staging area."
+            "\n\n"
+            "These apply only to the Flex. The OT-2 has no staging slots."
         ),
     )
 
@@ -680,6 +703,7 @@ class PotentialCutoutFixture:
 
     cutout_id: str
     cutout_fixture_id: str
+    provided_addressable_areas: FrozenSet[str]
 
 
 class AreaType(Enum):
@@ -703,8 +727,6 @@ class AddressableArea:
     bounding_box: Dimensions
     position: AddressableOffsetVector
     compatible_module_types: List[SharedDataModuleType]
-    drop_tip_location: Optional[Point]
-    drop_labware_location: Optional[Point]
 
 
 class PostRunHardwareState(Enum):
@@ -734,7 +756,7 @@ class PostRunHardwareState(Enum):
     DISENGAGE_IN_PLACE = "disengageInPlace"
 
 
-NOZZLE_NAME_REGEX = "[A-Z][0-100]"
+NOZZLE_NAME_REGEX = r"[A-Z]\d{1,2}"
 PRIMARY_NOZZLE_LITERAL = Literal["A1", "H1", "A12", "H12"]
 
 
@@ -799,3 +821,115 @@ NozzleLayoutConfigurationType = Union[
 
 # TODO make the below some sort of better type
 DeckConfigurationType = List[Tuple[str, str]]  # cutout_id, cutout_fixture_id
+
+
+class TipPresenceStatus(str, Enum):
+    """Tip presence status reported by a pipette."""
+
+    PRESENT = "present"
+    ABSENT = "absent"
+    UNKNOWN = "unknown"
+
+    def to_hw_state(self) -> HwTipStateType:
+        """Convert to hardware tip state."""
+        assert self != TipPresenceStatus.UNKNOWN
+        return {
+            TipPresenceStatus.PRESENT: HwTipStateType.PRESENT,
+            TipPresenceStatus.ABSENT: HwTipStateType.ABSENT,
+        }[self]
+
+    @classmethod
+    def from_hw_state(cls, state: HwTipStateType) -> "TipPresenceStatus":
+        """Convert from hardware tip state."""
+        return {
+            HwTipStateType.PRESENT: TipPresenceStatus.PRESENT,
+            HwTipStateType.ABSENT: TipPresenceStatus.ABSENT,
+        }[state]
+
+
+class RTPBase(BaseModel):
+    """Parameters defined in a protocol."""
+
+    displayName: str = Field(..., description="Display string for the parameter.")
+    variableName: str = Field(..., description="Python variable name of the parameter.")
+    description: Optional[str] = Field(
+        None, description="Detailed description of the parameter."
+    )
+    suffix: Optional[str] = Field(
+        None,
+        description="Units (like mL, mm/sec, etc) or a custom suffix for the parameter.",
+    )
+
+
+class NumberParameter(RTPBase):
+    """An integer parameter defined in a protocol."""
+
+    type: Literal["int", "float"] = Field(
+        ..., description="String specifying whether the number is an int or float type."
+    )
+    min: float = Field(
+        ..., description="Minimum value that the number param is allowed to have."
+    )
+    max: float = Field(
+        ..., description="Maximum value that the number param is allowed to have."
+    )
+    value: float = Field(
+        ...,
+        description="The value assigned to the parameter; if not supplied by the client, will be assigned the default value.",
+    )
+    default: float = Field(
+        ...,
+        description="Default value of the parameter, to be used when there is no client-specified value.",
+    )
+
+
+class BooleanParameter(RTPBase):
+    """A boolean parameter defined in a protocol."""
+
+    type: Literal["bool"] = Field(
+        default="bool", description="String specifying the type of this parameter"
+    )
+    value: bool = Field(
+        ...,
+        description="The value assigned to the parameter; if not supplied by the client, will be assigned the default value.",
+    )
+    default: bool = Field(
+        ...,
+        description="Default value of the parameter, to be used when there is no client-specified value.",
+    )
+
+
+class EnumChoice(BaseModel):
+    """Components of choices used in RTP Enum Parameters."""
+
+    displayName: str = Field(..., description="Display string for the param's choice.")
+    value: Union[float, str] = Field(
+        ..., description="Enum value of the param's choice."
+    )
+
+
+class EnumParameter(RTPBase):
+    """A string enum defined in a protocol."""
+
+    type: Literal["int", "float", "str"] = Field(
+        ...,
+        description="String specifying whether the parameter is an int or float or string type.",
+    )
+    choices: List[EnumChoice] = Field(
+        ..., description="List of valid choices for this parameter."
+    )
+    value: Union[float, str] = Field(
+        ...,
+        description="The value assigned to the parameter; if not supplied by the client, will be assigned the default value.",
+    )
+    default: Union[float, str] = Field(
+        ...,
+        description="Default value of the parameter, to be used when there is no client-specified value.",
+    )
+
+
+RunTimeParameter = Union[NumberParameter, EnumParameter, BooleanParameter]
+
+RunTimeParamValuesType = Dict[
+    str, Union[float, bool, str]
+]  # update value types as more RTP types are added

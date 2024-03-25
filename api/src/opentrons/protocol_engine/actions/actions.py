@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from typing import Optional, Union
+from opentrons.protocol_engine.error_recovery_policy import ErrorRecoveryType
 
 from opentrons.protocols.models import LabwareDefinition
 from opentrons.hardware_control.types import DoorState
@@ -15,7 +16,13 @@ from opentrons.hardware_control.modules import LiveData
 from opentrons_shared_data.errors import EnumeratedError
 
 from ..commands import Command, CommandCreate, CommandPrivateResult
-from ..types import LabwareOffsetCreate, ModuleDefinition, Liquid, DeckConfigurationType
+from ..types import (
+    LabwareOffsetCreate,
+    ModuleDefinition,
+    Liquid,
+    DeckConfigurationType,
+    AddressableAreaLocation,
+)
 
 
 @dataclass(frozen=True)
@@ -53,6 +60,13 @@ class StopAction:
     """
 
     from_estop: bool = False
+
+
+@dataclass(frozen=True)
+class ResumeFromRecoveryAction:
+    """See `ProtocolEngine.resume_from_recovery()`."""
+
+    pass
 
 
 @dataclass(frozen=True)
@@ -116,18 +130,13 @@ class UpdateCommandAction:
 
 @dataclass(frozen=True)
 class FailCommandAction:
-    """Mark a given command as failed.
+    """Mark a given command as failed."""
 
-    The given command and all currently queued commands will be marked
-    as failed due to the given error.
-    """
-
-    # TODO(mc, 2021-11-12): we'll likely need to add the command params
-    # to this payload for state reaction purposes
     command_id: str
     error_id: str
     failed_at: datetime
     error: EnumeratedError
+    type: ErrorRecoveryType
 
 
 @dataclass(frozen=True)
@@ -151,6 +160,18 @@ class AddLiquidAction:
     """Add a liquid, to apply to subsequent `LoadLiquid`s."""
 
     liquid: Liquid
+
+
+@dataclass(frozen=True)
+class AddAddressableAreaAction:
+    """Add a single addressable area to state.
+
+    This differs from the deck configuration in PlayAction which sends over a mapping of cutout fixtures.
+    This action will only load one addressable area and that should be pre-validated before being sent via
+    the action.
+    """
+
+    addressable_area: AddressableAreaLocation
 
 
 @dataclass(frozen=True)
@@ -185,6 +206,7 @@ Action = Union[
     PlayAction,
     PauseAction,
     StopAction,
+    ResumeFromRecoveryAction,
     FinishAction,
     HardwareStoppedAction,
     DoorChangeAction,
@@ -194,6 +216,7 @@ Action = Union[
     AddLabwareOffsetAction,
     AddLabwareDefinitionAction,
     AddModuleAction,
+    AddAddressableAreaAction,
     AddLiquidAction,
     ResetTipsAction,
     SetPipetteMovementSpeedAction,

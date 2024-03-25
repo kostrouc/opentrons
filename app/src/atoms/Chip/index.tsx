@@ -15,7 +15,13 @@ import { StyledText } from '../text'
 
 import type { IconName, StyleProps } from '@opentrons/components'
 
-export type ChipType = 'basic' | 'error' | 'neutral' | 'success' | 'warning'
+export type ChipType =
+  | 'basic'
+  | 'error'
+  | 'info'
+  | 'neutral'
+  | 'success'
+  | 'warning'
 
 interface ChipProps extends StyleProps {
   /** Display background color? */
@@ -26,6 +32,8 @@ interface ChipProps extends StyleProps {
   text: string
   /** name constant of the text color and the icon color to display */
   type: ChipType
+  /** has icon */
+  hasIcon?: boolean
 }
 
 const CHIP_PROPS_BY_TYPE: Record<
@@ -39,44 +47,52 @@ const CHIP_PROPS_BY_TYPE: Record<
   }
 > = {
   basic: {
-    backgroundColor: COLORS.darkBlack20,
-    borderRadius: BORDERS.borderRadiusSize1,
-    textColor: COLORS.darkBlack90,
+    backgroundColor: `${COLORS.black90}${COLORS.opacity20HexCode}`,
+    borderRadius: BORDERS.borderRadius4,
+    textColor: COLORS.grey60,
   },
   error: {
-    backgroundColor: COLORS.red3,
-    borderRadius: BORDERS.borderRadiusSize5,
-    iconColor: COLORS.red1,
-    textColor: COLORS.red1,
+    backgroundColor: COLORS.red35,
+    borderRadius: BORDERS.borderRadius40,
+    iconColor: COLORS.red60,
+    textColor: COLORS.red60,
+  },
+  info: {
+    backgroundColor: COLORS.blue35,
+    borderRadius: BORDERS.borderRadius40,
+    iconColor: COLORS.blue60,
+    textColor: COLORS.blue60,
   },
   neutral: {
-    backgroundColor: COLORS.darkBlack20,
-    borderRadius: BORDERS.borderRadiusSize5,
-    iconColor: COLORS.darkBlack90,
-    textColor: COLORS.darkBlack70,
+    backgroundColor: `${COLORS.black90}${COLORS.opacity20HexCode}`,
+    borderRadius: BORDERS.borderRadius40,
+    iconColor: COLORS.grey60,
+    textColor: COLORS.grey60,
   },
   success: {
-    backgroundColor: COLORS.green3,
-    borderRadius: BORDERS.borderRadiusSize5,
-    iconColor: COLORS.green1,
+    backgroundColor: COLORS.green35,
+    borderRadius: BORDERS.borderRadius40,
+    iconColor: COLORS.green60,
     iconName: 'ot-check',
-    textColor: COLORS.green1,
+    textColor: COLORS.green60,
   },
   warning: {
-    backgroundColor: COLORS.yellow3,
-    borderRadius: BORDERS.borderRadiusSize5,
-    iconColor: COLORS.yellow1,
-    textColor: COLORS.yellow1,
+    backgroundColor: COLORS.yellow35,
+    borderRadius: BORDERS.borderRadius40,
+    iconColor: COLORS.yellow60,
+    textColor: COLORS.yellow60,
   },
 }
 
-export function Chip({
-  background,
-  iconName,
-  type,
-  text,
-  ...styleProps
-}: ChipProps): JSX.Element {
+export function Chip(props: ChipProps): JSX.Element {
+  const {
+    background,
+    iconName,
+    type,
+    text,
+    hasIcon = true,
+    ...styleProps
+  } = props
   const backgroundColor =
     background === false && type !== 'basic'
       ? COLORS.transparent
@@ -95,7 +111,7 @@ export function Chip({
       data-testid={`Chip_${type}`}
       {...styleProps}
     >
-      {type !== 'basic' && (
+      {type !== 'basic' && hasIcon ? (
         <Icon
           name={icon}
           color={CHIP_PROPS_BY_TYPE[type].iconColor}
@@ -103,7 +119,7 @@ export function Chip({
           size="1.5rem"
           data-testid="RenderResult_icon"
         />
-      )}
+      ) : null}
       <StyledText
         fontSize={TYPOGRAPHY.fontSize22}
         lineHeight={TYPOGRAPHY.lineHeight28}

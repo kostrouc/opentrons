@@ -21,20 +21,23 @@ from opentrons.protocol_engine import (
     LabwareOffset,
 )
 
-from robot_server.protocols import ProtocolResource
+from robot_server.protocols.protocol_store import ProtocolResource
 from robot_server.runs.engine_store import EngineStore, EngineConflictError
 from robot_server.runs.run_data_manager import RunDataManager, RunNotCurrentError
-from robot_server.runs.run_models import Run, RunNotFoundError
+from robot_server.runs.run_models import Run, BadRun, RunNotFoundError, RunDataError
 from robot_server.runs.run_store import (
     RunStore,
     RunResource,
     CommandNotFoundError,
+    BadStateSummary,
 )
 from robot_server.service.task_runner import TaskRunner
+from robot_server.service.notifications import RunsPublisher
 
 from opentrons.protocol_engine import Liquid
 
 from opentrons_shared_data.labware.labware_definition import LabwareDefinition
+from opentrons_shared_data.errors.exceptions import InvalidStoredData
 
 
 @pytest.fixture
@@ -57,6 +60,12 @@ def mock_task_runner(decoy: Decoy) -> TaskRunner:
     return decoy.mock(cls=TaskRunner)
 
 
+@pytest.fixture()
+def mock_runs_publisher(decoy: Decoy) -> RunsPublisher:
+    """Get a mock RunsPublisher."""
+    return decoy.mock(cls=RunsPublisher)
+
+
 @pytest.fixture
 def engine_state_summary() -> StateSummary:
     """Get a StateSummary value object."""
@@ -75,6 +84,7 @@ def engine_state_summary() -> StateSummary:
 def run_resource() -> RunResource:
     """Get a StateSummary value object."""
     return RunResource(
+        ok=True,
         run_id="hello from the other side",
         protocol_id=None,
         created_at=datetime(year=2022, month=2, day=2),
@@ -99,12 +109,14 @@ def subject(
     mock_engine_store: EngineStore,
     mock_run_store: RunStore,
     mock_task_runner: TaskRunner,
+    mock_runs_publisher: RunsPublisher,
 ) -> RunDataManager:
     """Get a RunDataManager test subject."""
     return RunDataManager(
         engine_store=mock_engine_store,
         run_store=mock_run_store,
         task_runner=mock_task_runner,
+        runs_publisher=mock_runs_publisher,
     )
 
 
@@ -345,13 +357,18 @@ async def test_get_historical_run_no_data(
     """It should get a historical run from the store."""
     run_id = "hello world"
 
+    state_exc = InvalidStoredData("Oh no!")
+    run_error = RunDataError.from_exc(state_exc)
     decoy.when(mock_run_store.get(run_id=run_id)).then_return(run_resource)
-    decoy.when(mock_run_store.get_state_summary(run_id=run_id)).then_return(None)
+    decoy.when(mock_run_store.get_state_summary(run_id=run_id)).then_return(
+        BadStateSummary(dataError=state_exc)
+    )
     decoy.when(mock_engine_store.current_run_id).then_return("some other id")
 
     result = subject.get(run_id=run_id)
 
-    assert result == Run(
+    assert result == BadRun(
+        dataError=run_error,
         current=False,
         id=run_resource.run_id,
         protocolId=run_resource.protocol_id,
@@ -395,6 +412,7 @@ async def test_get_all_runs(
     )
 
     current_run_resource = RunResource(
+        ok=True,
         run_id="current-run",
         protocol_id=None,
         created_at=datetime(year=2022, month=2, day=2),
@@ -402,6 +420,7 @@ async def test_get_all_runs(
     )
 
     historical_run_resource = RunResource(
+        ok=True,
         run_id="historical-run",
         protocol_id=None,
         created_at=datetime(year=2023, month=3, day=3),

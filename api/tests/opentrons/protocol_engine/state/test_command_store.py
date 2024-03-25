@@ -5,12 +5,14 @@ from datetime import datetime
 from typing import NamedTuple, Type
 
 from opentrons_shared_data.errors import ErrorCodes
-from opentrons.ordered_set import OrderedSet
 from opentrons_shared_data.pipette.dev_types import PipetteNameType
+
+from opentrons.ordered_set import OrderedSet
 from opentrons.types import MountType, DeckSlotName
 from opentrons.hardware_control.types import DoorState
 
 from opentrons.protocol_engine import commands, errors
+from opentrons.protocol_engine.error_recovery_policy import ErrorRecoveryType
 from opentrons.protocol_engine.types import DeckSlotLocation, DeckType, WellLocation
 from opentrons.protocol_engine.state import Config
 from opentrons.protocol_engine.state.commands import (
@@ -82,6 +84,7 @@ def test_initial_state(
         commands_by_id=OrderedDict(),
         run_error=None,
         finish_error=None,
+        failed_command=None,
         latest_command_hash=None,
         stopped_by_estop=False,
     )
@@ -468,6 +471,7 @@ def test_command_failure_clears_queues() -> None:
         error_id="error-id",
         failed_at=datetime(year=2023, month=3, day=3),
         error=errors.ProtocolEngineError(message="oh no"),
+        type=ErrorRecoveryType.FAIL_RUN,
     )
 
     expected_failed_1 = commands.WaitForResume(
@@ -571,6 +575,7 @@ def test_setup_command_failure_only_clears_setup_command_queue() -> None:
         error_id="error-id",
         failed_at=datetime(year=2023, month=3, day=3),
         error=errors.ProtocolEngineError(message="oh no"),
+        type=ErrorRecoveryType.FAIL_RUN,
     )
     expected_failed_cmd_2 = commands.WaitForResume(
         id="command-id-2",
@@ -623,6 +628,90 @@ def test_setup_command_failure_only_clears_setup_command_queue() -> None:
     }
 
 
+def test_nonfatal_command_failure() -> None:
+    """Test the command queue if a command fails recoverably.
+
+    Commands that were after the failed command in the queue should be left in
+    the queue.
+    """
+    queue_1 = QueueCommandAction(
+        request=commands.WaitForResumeCreate(
+            params=commands.WaitForResumeParams(), key="command-key-1"
+        ),
+        request_hash=None,
+        created_at=datetime(year=2021, month=1, day=1),
+        command_id="command-id-1",
+    )
+    queue_2 = QueueCommandAction(
+        request=commands.WaitForResumeCreate(
+            params=commands.WaitForResumeParams(), key="command-key-2"
+        ),
+        request_hash=None,
+        created_at=datetime(year=2021, month=1, day=1),
+        command_id="command-id-2",
+    )
+    run_1 = UpdateCommandAction(
+        private_result=None,
+        command=commands.WaitForResume(
+            id="command-id-1",
+            key="command-key-1",
+            createdAt=datetime(year=2021, month=1, day=1),
+            startedAt=datetime(year=2022, month=2, day=2),
+            params=commands.WaitForResumeParams(),
+            status=commands.CommandStatus.RUNNING,
+        ),
+    )
+    fail_1 = FailCommandAction(
+        command_id="command-id-1",
+        error_id="error-id",
+        failed_at=datetime(year=2023, month=3, day=3),
+        error=errors.ProtocolEngineError(message="oh no"),
+        type=ErrorRecoveryType.WAIT_FOR_RECOVERY,
+    )
+
+    expected_failed_1 = commands.WaitForResume(
+        id="command-id-1",
+        key="command-key-1",
+        error=errors.ErrorOccurrence(
+            id="error-id",
+            createdAt=datetime(year=2023, month=3, day=3),
+            errorCode=ErrorCodes.GENERAL_ERROR.value.code,
+            errorType="ProtocolEngineError",
+            detail="oh no",
+        ),
+        createdAt=datetime(year=2021, month=1, day=1),
+        startedAt=datetime(year=2022, month=2, day=2),
+        completedAt=datetime(year=2023, month=3, day=3),
+        params=commands.WaitForResumeParams(),
+        status=commands.CommandStatus.FAILED,
+    )
+    expected_queued_2 = commands.WaitForResume(
+        id="command-id-2",
+        key="command-key-2",
+        error=None,
+        createdAt=datetime(year=2021, month=1, day=1),
+        startedAt=None,
+        completedAt=None,
+        params=commands.WaitForResumeParams(),
+        status=commands.CommandStatus.QUEUED,
+    )
+
+    subject = CommandStore(is_door_open=False, config=_make_config())
+
+    subject.handle_action(queue_1)
+    subject.handle_action(queue_2)
+    subject.handle_action(run_1)
+    subject.handle_action(fail_1)
+
+    assert subject.state.running_command_id is None
+    assert subject.state.queued_command_ids == OrderedSet(["command-id-2"])
+    assert subject.state.all_command_ids == ["command-id-1", "command-id-2"]
+    assert subject.state.commands_by_id == {
+        "command-id-1": CommandEntry(index=0, command=expected_failed_1),
+        "command-id-2": CommandEntry(index=1, command=expected_queued_2),
+    }
+
+
 def test_command_store_preserves_handle_order() -> None:
     """It should store commands in the order they are handled."""
     # Any arbitrary 3 commands that compare non-equal (!=) to each other.
@@ -672,6 +761,7 @@ def test_command_store_handles_pause_action(pause_source: PauseSource) -> None:
         commands_by_id=OrderedDict(),
         run_error=None,
         finish_error=None,
+        failed_command=None,
         latest_command_hash=None,
         stopped_by_estop=False,
     )
@@ -699,6 +789,7 @@ def test_command_store_handles_play_action(pause_source: PauseSource) -> None:
         commands_by_id=OrderedDict(),
         run_error=None,
         finish_error=None,
+        failed_command=None,
         run_started_at=datetime(year=2021, month=1, day=1),
         latest_command_hash=None,
         stopped_by_estop=False,
@@ -728,6 +819,7 @@ def test_command_store_handles_finish_action() -> None:
         commands_by_id=OrderedDict(),
         run_error=None,
         finish_error=None,
+        failed_command=None,
         run_started_at=datetime(year=2021, month=1, day=1),
         latest_command_hash=None,
         stopped_by_estop=False,
@@ -772,6 +864,7 @@ def test_command_store_handles_stop_action(from_estop: bool) -> None:
         commands_by_id=OrderedDict(),
         run_error=None,
         finish_error=None,
+        failed_command=None,
         run_started_at=datetime(year=2021, month=1, day=1),
         latest_command_hash=None,
         stopped_by_estop=from_estop,
@@ -800,6 +893,7 @@ def test_command_store_cannot_restart_after_should_stop() -> None:
         commands_by_id=OrderedDict(),
         run_error=None,
         finish_error=None,
+        failed_command=None,
         run_started_at=None,
         latest_command_hash=None,
         stopped_by_estop=False,
@@ -930,6 +1024,7 @@ def test_command_store_wraps_unknown_errors() -> None:
             },
         ),
         run_started_at=None,
+        failed_command=None,
         latest_command_hash=None,
         stopped_by_estop=False,
     )
@@ -989,6 +1084,7 @@ def test_command_store_preserves_enumerated_errors() -> None:
             detail="yikes",
             errorCode=ErrorCodes.PIPETTE_NOT_PRESENT.value.code,
         ),
+        failed_command=None,
         run_started_at=None,
         latest_command_hash=None,
         stopped_by_estop=False,
@@ -1019,6 +1115,7 @@ def test_command_store_ignores_stop_after_graceful_finish() -> None:
         commands_by_id=OrderedDict(),
         run_error=None,
         finish_error=None,
+        failed_command=None,
         run_started_at=datetime(year=2021, month=1, day=1),
         latest_command_hash=None,
         stopped_by_estop=False,
@@ -1049,6 +1146,7 @@ def test_command_store_ignores_finish_after_non_graceful_stop() -> None:
         commands_by_id=OrderedDict(),
         run_error=None,
         finish_error=None,
+        failed_command=None,
         run_started_at=datetime(year=2021, month=1, day=1),
         latest_command_hash=None,
         stopped_by_estop=False,
@@ -1081,6 +1179,7 @@ def test_command_store_handles_command_failed() -> None:
             error_id="error-id",
             failed_at=datetime(year=2022, month=2, day=2),
             error=errors.ProtocolEngineError(message="oh no"),
+            type=ErrorRecoveryType.FAIL_RUN,
         )
     )
 
@@ -1098,6 +1197,7 @@ def test_command_store_handles_command_failed() -> None:
         },
         run_error=None,
         finish_error=None,
+        failed_command=CommandEntry(index=0, command=expected_failed_command),
         run_started_at=None,
         latest_command_hash=None,
         stopped_by_estop=False,
@@ -1124,6 +1224,7 @@ def test_handles_hardware_stopped() -> None:
         commands_by_id=OrderedDict(),
         run_error=None,
         finish_error=None,
+        failed_command=None,
         run_started_at=None,
         latest_command_hash=None,
         stopped_by_estop=False,

@@ -128,7 +128,6 @@ class GetStatusResponsePayload(EmptyPayload):
     """Get status response."""
 
     status: utils.UInt8Field
-    data: utils.UInt32Field
 
 
 @dataclass(eq=False)
@@ -528,6 +527,13 @@ class GripperJawStatePayload(EmptyPayload):
 
 
 @dataclass(eq=False)
+class GripperJawHoldoffPayload(EmptyPayload):
+    """A respones carrying info about the jaw holdoff value of a gripper."""
+
+    holdoff_ms: utils.UInt32Field
+
+
+@dataclass(eq=False)
 class GripperMoveRequestPayload(AddToMoveGroupRequestPayload):
     """A request to move gripper."""
 
@@ -620,3 +626,44 @@ class GetMotorUsageResponsePayload(_GetMotorUsageResponsePayloadBase):
         return inst
 
     usage_elements: List[MotorUsageTypeField]
+
+
+@dataclass(eq=False)
+class HepaUVInfoResponsePayload(EmptyPayload):
+    """A response carrying data about an attached hepa uv."""
+
+    model: utils.UInt16Field
+    serial: SerialDataCodeField
+
+
+@dataclass(eq=False)
+class SetHepaFanStateRequestPayload(EmptyPayload):
+    """A request to set the state and pwm of a the hepa fan."""
+
+    duty_cycle: utils.UInt32Field
+    fan_on: utils.UInt8Field
+
+
+@dataclass(eq=False)
+class GetHepaFanStatePayloadResponse(EmptyPayload):
+    """A response with the state and pwm of the fan."""
+
+    duty_cycle: utils.UInt32Field
+    fan_on: utils.UInt8Field
+
+
+@dataclass(eq=False)
+class SetHepaUVStateRequestPayload(EmptyPayload):
+    """A request to set the state and timeout in seconds of the hepa uv light."""
+
+    uv_duration_s: utils.UInt32Field
+    uv_light_on: utils.UInt8Field
+
+
+@dataclass(eq=False)
+class GetHepaUVStatePayloadResponse(EmptyPayload):
+    """A response with the state and timeout in seconds of the hepa uv light."""
+
+    uv_duration_s: utils.UInt32Field
+    uv_light_on: utils.UInt8Field
+    remaining_time_s: utils.UInt32Field
