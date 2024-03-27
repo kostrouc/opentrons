@@ -122,7 +122,7 @@ DEFAULT_MAX_SPEED_DISCONTINUITY: Final[
         OT3AxisKind.X: 10,
         OT3AxisKind.Y: 10,
         OT3AxisKind.Z: 5,
-        OT3AxisKind.P: 5,
+        OT3AxisKind.P: 0.41,  # NOTE: (sigler) equivalent to ~6.5 ul/sec (nominal)
         OT3AxisKind.Z_G: 10,
         OT3AxisKind.Q: 5,
     },
