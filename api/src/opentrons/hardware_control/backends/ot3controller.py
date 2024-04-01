@@ -585,9 +585,10 @@ class OT3Controller:
         if not pipette_axes:
             return None
 
-        speed_settings = self._configuration.motion_settings.max_speed_discontinuity[
-            gantry_load
-        ]
+        # speed_settings = self._configuration.motion_settings.max_speed_discontinuity[
+        #     gantry_load
+        # ]
+        speed_settings = {OT3AxisKind.P: 5}  # TODO: delete this
         move_groups: List[MoveGroup] = self._build_axes_home_groups(
             pipette_axes, speed_settings
         )

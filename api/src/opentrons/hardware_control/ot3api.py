@@ -1722,12 +1722,12 @@ class OT3API(
                 pip_ax: instrument.config.plunger_homing_configurations.current
             }
         ):
-            if self._current_position[pip_ax] > backlash_pos_above[pip_ax]:
-                await self._move(
-                    backlash_pos_above,
-                    speed=(speed_up * rate),
-                    acquire_lock=acquire_lock,
-                )
+            # if self._current_position[pip_ax] > backlash_pos_above[pip_ax]:
+            #     await self._move(
+            #         backlash_pos_above,
+            #         speed=(speed_up * rate),
+            #         acquire_lock=acquire_lock,
+            #     )
             if self._current_position[pip_ax] < backlash_pos_below[pip_ax]:
                 await self._move(
                     backlash_pos_below,
