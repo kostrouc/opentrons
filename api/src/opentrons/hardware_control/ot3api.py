@@ -2189,7 +2189,7 @@ class OT3API(
             instrument.current_tiprack_diameter = 0.0
             instrument.remove_tip()
 
-        await self._move_to_plunger_bottom(realmount, rate=1.0, check_current_vol=False)
+        # await self._move_to_plunger_bottom(realmount, rate=1.0, check_current_vol=False)
 
         if self.gantry_load == GantryLoad.HIGH_THROUGHPUT:
             spec = self._pipette_handler.plan_ht_drop_tip()
