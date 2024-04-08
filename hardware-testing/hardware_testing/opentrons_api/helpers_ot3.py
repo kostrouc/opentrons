@@ -731,10 +731,10 @@ async def _jog_print_current_position(
     z_axis = Axis.by_mount(mount)
     instr_axis = Axis.of_main_tool_actuator(mount)
     motors_pos = await api.current_position_ot3(
-        mount=mount, critical_point=critical_point
+        mount=mount, critical_point=critical_point, refresh=True
     )
     enc_pos = await api.encoder_current_position_ot3(
-        mount=mount, critical_point=critical_point
+        mount=mount, critical_point=critical_point, refresh=True
     )
     mx, my, mz, mp = [
         round(motors_pos[ax], 2) for ax in [Axis.X, Axis.Y, z_axis, instr_axis]

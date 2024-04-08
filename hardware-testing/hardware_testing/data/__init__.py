@@ -1,10 +1,12 @@
 """Data for hardware-testing."""
+import contextlib
 from datetime import datetime
 import os
 from pathlib import Path
 from subprocess import check_output
 from time import time
-from typing import Tuple, Union, List, Any
+from typing import Tuple, Union, List, Any, Optional
+from typing_extensions import Literal
 
 from opentrons.config import infer_config_base_dir, IS_ROBOT
 
@@ -98,6 +100,42 @@ def create_file_name(
 ) -> str:
     """Create a file name, given a test name."""
     return f"{test_name}_{run_id}_{tag}.{extension}"
+
+
+class File:
+    def __init__(
+        self, test_name: str, run_id: str, tag: str, extension: str = "csv"
+    ) -> None:
+        self._test_name = test_name
+        self._run_id = run_id
+        self._tag = tag
+        self._file_name = create_file_name(test_name, run_id, tag, extension)
+        test_path = create_folder_for_test_data(self._test_name)
+        run_path = create_folder_for_test_data(test_path / self._run_id)
+        self._data_path = test_path / run_path / self._file_name
+        self.append("")
+
+    def dump(self, data_str: str) -> None:
+        dump_data_to_file(self._test_name, self._run_id, self._file_name, data_str)
+
+    def append(self, data_str: str) -> None:
+        append_data_to_file(self._test_name, self._run_id, self._file_name, data_str)
+
+    @contextlib.contextmanager
+    def continuous_write(self, mode: Literal["dump", "append"]) -> None:
+        perm = {"dump": "w+", "append": "a+"}[mode]
+        with open(self._data_path, perm) as f:
+            yield f
+        return
+
+
+def create_file(
+    test_name: str, tag: str, run_id: Optional[str] = None, extension: str = "csv"
+) -> File:
+    """Create a file name, given a test name."""
+    if run_id is None:
+        run_id = create_run_id()
+    return File(test_name, run_id, tag, extension)
 
 
 def _save_data(
