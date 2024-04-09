@@ -75,7 +75,7 @@ def _load_pipette(model: str) -> Optional[Pipette]:
         pip = Pipette(config=configurations, pipette_offset_cal=pip_cal_obj)
         return pip
     except (FileNotFoundError, KeyError) as e:
-        print(f"ERROR: [{model}] {e}")
+        # print(f"ERROR: [{model}] {e}")
         return None
 
 
@@ -108,10 +108,13 @@ def _get_max_flow_rate_at_volume(pipette: Pipette, volume: float) -> float:
 
 
 async def _main() -> None:
+    print("--------------COPY PASTE BELOW INTO GOOGLE SHEET---------------")
+    print("model\tvolume\tmax-flow-rate")
     for pipette in _load_all_pipettes():
         for volume in _get_spec_volumes(pipette):
             flow_rate = _get_max_flow_rate_at_volume(pipette, volume)
-            print(f"{pipette.model},{volume},{flow_rate}")
+            print(f"{pipette.model}\t{volume}\t{flow_rate}")
+    print("--------------          DONE                   ---------------")
 
 
 if __name__ == "__main__":
