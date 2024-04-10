@@ -124,7 +124,7 @@ async def handle_pressure_sensor(
             await sleep(0.1)
             return await _read(_s)
         if not isinstance(d, SensorDataType):
-            print(f"got no data: {curr_time}")
+            print(f"got no data")
             await sleep(0.1)
             return await _read(_s)
         await sleep(0.05)
