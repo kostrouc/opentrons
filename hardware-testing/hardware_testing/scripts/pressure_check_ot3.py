@@ -612,7 +612,7 @@ async def _main(
 ) -> None:
     global _available_tips
     api = await helpers_ot3.build_async_ot3_hardware_api(
-        is_simulating=is_simulating, pipette_left="p50_multi_v3.5"
+        is_simulating=is_simulating, pipette_left="p1000_single_v3.5"
     )
     pipette = PipetteSettings.build(api, tip, offset_tip_rack, offset_reservoir)
     await _reset_hardware(api, pipette)
