@@ -123,14 +123,20 @@ def prompt_message(
     get_user_input: GetInputFunc, output_func: OutputFunc
 ) -> Tuple[SensorRun, bool]:
     """A list of all the information required to perform an initial sensor test."""
-    sensor_type = prompt_sensor_type(get_user_input, output_func)
-    mount = prompt_str_input(
-        'pipette mounts:"left" or "right", gripper mount: "gripper"', get_user_input
-    )
-    serial_number = prompt_str_input("instrument serial number", get_user_input)
-    auto_zero = prompt_bool_input("auto zero?", get_user_input)
-    minutes = prompt_float_input("script run time in minutes", get_user_input)
-    output_to_csv = prompt_bool_input("output to csv?", get_user_input)
+    # sensor_type = prompt_sensor_type(get_user_input, output_func)
+    sensor_type = SensorType.pressure
+    # mount = prompt_str_input(
+    #     'pipette mounts:"left" or "right", gripper mount: "gripper"', get_user_input
+    # )
+    mount = "left"
+    # serial_number = prompt_str_input("instrument serial number", get_user_input)
+    serial_number = ""
+    # auto_zero = prompt_bool_input("auto zero?", get_user_input)
+    auto_zero = False
+    # minutes = prompt_float_input("script run time in minutes", get_user_input)
+    minutes = 300.0
+    # output_to_csv = prompt_bool_input("output to csv?", get_user_input)
+    output_to_csv = True
 
     sensor_run = SensorRun(sensor_type, serial_number, bool(auto_zero), minutes, mount)
     return sensor_run, output_to_csv

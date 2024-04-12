@@ -88,10 +88,8 @@ async def handle_pressure_sensor(
     """Function to read data from the pressure sensor."""
     start_time = datetime.now()
     csv = None
-    if "y" in input("is this an 8ch or 96ch? (y/n): ").lower():
-        sensor_ids = [SensorId.S0, SensorId.S1]
-    else:
-        sensor_ids = [SensorId.S0]
+    # sensor_ids = [SensorId.S0, SensorId.S1]
+    sensor_ids = [SensorId.S0]
     sensors = {s: sensor_types.PressureSensor.build(s, node_id) for s in sensor_ids}
     s_driver = sensor_driver.SensorDriver()
     if include_csv:
@@ -117,7 +115,7 @@ async def handle_pressure_sensor(
 
     async def _read(_s: sensor_types.PressureSensor) -> Tuple[float, float]:
         try:
-            d = await s_driver.read(messenger, _s, offset=False, timeout=10)
+            d = await s_driver.read(messenger, _s, offset=False, timeout=2)
             t = time()
         except Exception as exc:
             print(exc)
