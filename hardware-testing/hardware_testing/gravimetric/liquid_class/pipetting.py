@@ -246,9 +246,9 @@ def _pipette_with_liquid_settings(  # noqa: C901
             hw_api.configure_for_volume(hw_mount, aspirate if aspirate else dispense)
         if clear_accuracy_function:
             clear_pipette_ul_per_mm(hw_api, hw_mount)  # type: ignore[arg-type]
-        for _ in range(10):
+        for _ in range(1):
             hw_api.prepare_for_aspirate(hw_mount)
-        ctx.delay(seconds=0)  # TODO: delete this
+        ctx.delay(seconds=10)  # TODO: delete this
         if liquid_class.aspirate.leading_air_gap > 0:
             pipette.aspirate(liquid_class.aspirate.leading_air_gap)
 
