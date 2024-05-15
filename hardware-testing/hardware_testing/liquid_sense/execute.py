@@ -308,9 +308,14 @@ def _run_trial(
         if run_args.plunger_speed == -1
         else run_args.plunger_speed
     )
+    # operator defines number of seconds between the start of the probe movement and meniscus contact
+    # calculating the ideal starting position is then easy because no acceleration is involved during a probe
+    starting_mm_above_liquid = run_args.probe_seconds_before_contact * run_args.z_speed
+    starting_mount_height = (
+        well.bottom(z=liquid_height).point.z + starting_mm_above_liquid
+    )
     lps = LiquidProbeSettings(
-        starting_mount_height=well.bottom(z=liquid_height).point.z
-        + run_args.start_height_offset,
+        starting_mount_height=starting_mount_height,
         max_z_distance=min(well.depth, lqid_cfg["max_z_distance"]),
         min_z_distance=lqid_cfg["min_z_distance"],
         mount_speed=run_args.z_speed,
