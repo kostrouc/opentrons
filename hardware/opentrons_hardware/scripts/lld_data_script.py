@@ -3,7 +3,7 @@ import csv
 import os
 import argparse
 from typing import List, Optional, Tuple, Any, Dict
-import matplotlib.pyplot as plot
+import matplotlib.pyplot as pyplot
 import numpy
 from abc import ABC, abstractmethod
 
@@ -236,7 +236,7 @@ def _running_avg(
     pressure: List[float],
     z_travel: List[float],
     p_travel: List[float],
-    no_plot: bool,
+    plot: bool,
     algorithm: LLDAlgoABC,
     plot_name: str,
 ) -> Optional[Tuple[float, float, float]]:
@@ -254,7 +254,7 @@ def _running_avg(
             # print(f"found z height = {z_travel[i]}")
             # print(f"at time = {time[i]}")
             return_val = time[i], z_travel[i], p_travel[i]
-            if no_plot:
+            if not plot:
                 # once we find it we don't need to keep going
                 break
         if average != impossible_pressure and prev_avg != impossible_pressure:
@@ -271,18 +271,18 @@ def _running_avg(
     )
     avg_array: numpy.ndarray[Any, numpy.dtype[numpy.float32]] = numpy.array(running_avg)
 
-    if not no_plot:
-        plot.figure(plot_name)
-        avg_ax = plot.subplot(211)
+    if plot:
+        pyplot.figure(plot_name)
+        avg_ax = pyplot.subplot(211)
         avg_ax.set_title("Running Average")
-        plot.plot(time_array, avg_array)
-        der_ax = plot.subplot(212)
+        pyplot.plot(time_array, avg_array)
+        der_ax = pyplot.subplot(212)
         der_ax.set_title("Derivative")
-        plot.plot(time_array, derivative_array)
-        mng = plot.get_current_fig_manager()
+        pyplot.plot(time_array, derivative_array)
+        mng = pyplot.get_current_fig_manager()
         if mng is not None:
             mng.resize(*mng.window.maxsize())  # type: ignore[attr-defined]
-        plot.show()
+        pyplot.show()
 
     return return_val
 
@@ -302,7 +302,7 @@ def run(
             reader = csv.reader(file)
             reader_list = list(reader)
 
-        number_of_trials = int(reader_list[34][2])
+        number_of_trials = int(reader_list[33][2])
 
         expected_height = reader_list[44][6]
         # have a time list for each trial so the list lengths can all be equal
@@ -315,9 +315,9 @@ def run(
             p_travel = []
             for row in range((59 + number_of_trials), len(reader_list)):
                 current_time = reader_list[row][0]
-                current_pressure = reader_list[row][3 * trial + 2]
+                current_p_pos = reader_list[row][3 * trial + 2]
                 current_z_pos = reader_list[row][3 * trial + 3]
-                current_p_pos = reader_list[row][3 * trial + 4]
+                current_pressure = reader_list[row][3 * trial + 4]
 
                 if any(
                     [
@@ -337,7 +337,7 @@ def run(
                 pressure,
                 z_travel,
                 p_travel,
-                args.no_plot,
+                args.plot,
                 algorithm,
                 f"{algorithm.name()} trial: {trial+1}",
             )
@@ -389,7 +389,7 @@ def main() -> None:
         help="path to the input file",
         default=None,
     )
-    parser.add_argument("--no-plot", action="store_true")
+    parser.add_argument("--plot", action="store_true")
     args = parser.parse_args()
 
     algorithms: List[LLDAlgoABC] = [
