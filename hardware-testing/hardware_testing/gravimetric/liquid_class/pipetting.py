@@ -234,7 +234,7 @@ def _pipette_with_liquid_settings(  # noqa: C901
             pipette.configure_for_volume(cfg_volume)
         if clear_accuracy_function:
             clear_pipette_ul_per_mm(hw_api, hw_mount)  # type: ignore[arg-type]
-        pipette.prepare_to_aspirate()
+        # pipette.prepare_to_aspirate() # A-no-prep state
         if liquid_class.aspirate.leading_air_gap > 0:
             pipette.aspirate(liquid_class.aspirate.leading_air_gap)
 
