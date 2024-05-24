@@ -123,7 +123,7 @@ DEFAULT_MAX_SPEED_DISCONTINUITY: Final[
         OT3AxisKind.X: 10,
         OT3AxisKind.Y: 10,
         OT3AxisKind.Z: 5,
-        OT3AxisKind.P: 5,
+        OT3AxisKind.P: 0.41, # B-no-prep
         OT3AxisKind.Z_G: 5,
         OT3AxisKind.Q: 5,
     },
