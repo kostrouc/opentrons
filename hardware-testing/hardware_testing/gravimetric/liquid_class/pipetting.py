@@ -338,9 +338,10 @@ def _pipette_with_liquid_settings(  # noqa: C901
         # aspirate specified volume
         callbacks.on_aspirating()
         if pipette.channels == 96:
-            _set_96ch_plunger_discontinuity(
-                ctx, config.DISCONTINUITY_DURING_96CH_ASPIRATE
-            )
+            pass
+            # _set_96ch_plunger_discontinuity(
+            #     ctx, config.DISCONTINUITY_DURING_96CH_ASPIRATE
+            # )
         try:
             pipette.aspirate(aspirate)
         finally:
