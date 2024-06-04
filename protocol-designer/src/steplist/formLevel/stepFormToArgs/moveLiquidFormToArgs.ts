@@ -1,5 +1,4 @@
-import assert from 'assert'
-import { getWellsDepth, LabwareDefinition2 } from '@opentrons/shared-data'
+import { getWellsDepth } from '@opentrons/shared-data'
 import { DEST_WELL_BLOWOUT_DESTINATION } from '@opentrons/step-generation'
 import {
   DEFAULT_MM_FROM_BOTTOM_ASPIRATE,
@@ -9,13 +8,15 @@ import {
 } from '../../../constants'
 import { getOrderedWells } from '../../utils'
 import { getMoveLiquidDelayData } from './getDelayData'
-import { HydratedMoveLiquidFormData } from '../../../form-types'
+import { getMatchingTipLiquidSpecs } from '../../../utils'
 import type {
   ConsolidateArgs,
   DistributeArgs,
   TransferArgs,
   InnerMixArgs,
 } from '@opentrons/step-generation'
+import type { LabwareDefinition2 } from '@opentrons/shared-data'
+import type { HydratedMoveLiquidFormData } from '../../../form-types'
 type MoveLiquidFields = HydratedMoveLiquidFormData['fields']
 
 // NOTE(sa, 2020-08-11): leaving this as fn so it can be expanded later for dispense air gap
@@ -62,12 +63,11 @@ type MoveLiquidStepArgs = ConsolidateArgs | DistributeArgs | TransferArgs | null
 export const moveLiquidFormToArgs = (
   hydratedFormData: HydratedMoveLiquidFormData
 ): MoveLiquidStepArgs => {
-  assert(
+  console.assert(
     hydratedFormData.stepType === 'moveLiquid',
     `moveLiquidFormToArgs called with stepType ${hydratedFormData.stepType}, expected "moveLiquid"`
   )
   const fields = hydratedFormData.fields
-  const pipetteSpec = fields.pipette.spec
   const pipetteId = fields.pipette.id
   const {
     volume,
@@ -77,7 +77,13 @@ export const moveLiquidFormToArgs = (
     dispense_wells: destWellsUnordered,
     dropTip_location: dropTipLocation,
     path,
+    tipRack,
     nozzles,
+    aspirate_x_position,
+    dispense_x_position,
+    aspirate_y_position,
+    dispense_y_position,
+    blowout_z_offset,
   } = fields
   let sourceWells = getOrderedWells(
     fields.aspirate_wells,
@@ -161,7 +167,10 @@ export const moveLiquidFormToArgs = (
   )
   const blowoutLocation =
     (fields.blowout_checkbox && fields.blowout_location) || null
-  const blowoutOffsetFromTopMm = DEFAULT_MM_BLOWOUT_OFFSET_FROM_TOP
+  const blowoutOffsetFromTopMm =
+    blowoutLocation != null
+      ? blowout_z_offset ?? DEFAULT_MM_BLOWOUT_OFFSET_FROM_TOP
+      : DEFAULT_MM_BLOWOUT_OFFSET_FROM_TOP
   const aspirateAirGapVolume = getAirGapData(
     fields,
     'aspirate_airGap_checkbox',
@@ -172,21 +181,30 @@ export const moveLiquidFormToArgs = (
     'dispense_airGap_checkbox',
     'dispense_airGap_volume'
   )
+  const matchingTipLiquidSpecs = getMatchingTipLiquidSpecs(
+    fields.pipette,
+    fields.volume,
+    tipRack
+  )
   const commonFields = {
     pipette: pipetteId,
     volume,
     sourceLabware: sourceLabware.id,
     destLabware: destLabware.id,
+    tipRack: tipRack,
     aspirateFlowRateUlSec:
-      fields.aspirate_flowRate || pipetteSpec.defaultAspirateFlowRate.value,
+      fields.aspirate_flowRate ||
+      matchingTipLiquidSpecs.defaultAspirateFlowRate.default,
     dispenseFlowRateUlSec:
-      fields.dispense_flowRate || pipetteSpec.defaultDispenseFlowRate.value,
+      fields.dispense_flowRate ||
+      matchingTipLiquidSpecs.defaultDispenseFlowRate.default,
     aspirateOffsetFromBottomMm:
       fields.aspirate_mmFromBottom || DEFAULT_MM_FROM_BOTTOM_ASPIRATE,
     dispenseOffsetFromBottomMm:
       fields.dispense_mmFromBottom || DEFAULT_MM_FROM_BOTTOM_DISPENSE,
     blowoutFlowRateUlSec:
-      fields.dispense_flowRate || pipetteSpec.defaultBlowOutFlowRate.value,
+      fields.blowout_flowRate ||
+      matchingTipLiquidSpecs.defaultBlowOutFlowRate.default,
     blowoutOffsetFromTopMm,
     changeTip: fields.changeTip,
     preWetTip: Boolean(fields.preWetTip),
@@ -202,12 +220,16 @@ export const moveLiquidFormToArgs = (
     name: hydratedFormData.stepName,
     dropTipLocation,
     nozzles,
+    aspirateXOffset: aspirate_x_position ?? 0,
+    aspirateYOffset: aspirate_y_position ?? 0,
+    dispenseXOffset: dispense_x_position ?? 0,
+    dispenseYOffset: dispense_y_position ?? 0,
   }
-  assert(
+  console.assert(
     sourceWellsUnordered.length > 0,
     'expected sourceWells to have length > 0'
   )
-  assert(
+  console.assert(
     !(
       path === 'multiDispense' &&
       blowoutLocation === DEST_WELL_BLOWOUT_DESTINATION
@@ -219,7 +241,7 @@ export const moveLiquidFormToArgs = (
     console.error('expected to have destWells.length > 0 but got none')
   }
 
-  assert(
+  console.assert(
     !(path === 'multiDispense' && destWells == null),
     'cannot distribute when destWells is null'
   )
@@ -268,7 +290,7 @@ export const moveLiquidFormToArgs = (
     }
 
     default: {
-      assert(
+      console.assert(
         false,
         `moveLiquidFormToArgs got unexpected "path" field value: ${path}`
       )

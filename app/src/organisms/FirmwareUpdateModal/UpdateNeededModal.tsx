@@ -1,16 +1,22 @@
 import * as React from 'react'
+import { createPortal } from 'react-dom'
 import { useTranslation, Trans } from 'react-i18next'
 import capitalize from 'lodash/capitalize'
-import { COLORS, DIRECTION_COLUMN, Flex, SPACING } from '@opentrons/components'
+import {
+  COLORS,
+  DIRECTION_COLUMN,
+  Flex,
+  SPACING,
+  StyledText,
+} from '@opentrons/components'
 import {
   useInstrumentsQuery,
   useSubsystemUpdateQuery,
   useUpdateSubsystemMutation,
 } from '@opentrons/react-api-client'
 import { LEFT, RIGHT } from '@opentrons/shared-data'
-import { Portal } from '../../App/portal'
+import { getTopPortalEl } from '../../App/portal'
 import { SmallButton } from '../../atoms/buttons'
-import { StyledText } from '../../atoms/text'
 import { Modal } from '../../molecules/Modal'
 import { UpdateInProgressModal } from './UpdateInProgressModal'
 import { UpdateResultsModal } from './UpdateResultsModal'
@@ -58,7 +64,6 @@ export function UpdateNeededModal(props: UpdateNeededModalProps): JSX.Element {
     }
   }, [status, setInitiatedSubsystemUpdate])
 
-  const percentComplete = updateData?.data.updateProgress ?? 0
   const updateError = updateData?.data.updateError
   const instrumentType = subsystem === 'gripper' ? 'gripper' : 'pipette'
   let mount = ''
@@ -68,7 +73,7 @@ export function UpdateNeededModal(props: UpdateNeededModalProps): JSX.Element {
   const updateNeededHeader: ModalHeaderBaseProps = {
     title: t('update_needed'),
     iconName: 'ot-alert',
-    iconColor: COLORS.yellow2,
+    iconColor: COLORS.yellow50,
   }
 
   let modalContent = (
@@ -102,12 +107,7 @@ export function UpdateNeededModal(props: UpdateNeededModalProps): JSX.Element {
     (status === 'updating' || status === 'queued') &&
     ongoingUpdateId != null
   ) {
-    modalContent = (
-      <UpdateInProgressModal
-        percentComplete={percentComplete}
-        subsystem={subsystem}
-      />
-    )
+    modalContent = <UpdateInProgressModal subsystem={subsystem} />
   } else if (status === 'done' && ongoingUpdateId != null) {
     modalContent = (
       <UpdateResultsModal
@@ -122,5 +122,5 @@ export function UpdateNeededModal(props: UpdateNeededModalProps): JSX.Element {
     )
   }
 
-  return <Portal level="top">{modalContent}</Portal>
+  return createPortal(modalContent, getTopPortalEl())
 }

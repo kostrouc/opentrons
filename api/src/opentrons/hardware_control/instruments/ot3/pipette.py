@@ -25,12 +25,12 @@ from opentrons_shared_data.errors.exceptions import (
     CommandPreconditionViolated,
     PythonException,
 )
-from ..instrument_abc import AbstractInstrument
-from ..instrument_helpers import (
+from opentrons_shared_data.pipette.ul_per_mm import (
     piecewise_volume_conversion,
     PIPETTING_FUNCTION_FALLBACK_VERSION,
     PIPETTING_FUNCTION_LATEST_VERSION,
 )
+from ..instrument_abc import AbstractInstrument
 from .instrument_calibration import (
     save_pipette_offset_calibration,
     load_pipette_offset,
@@ -667,8 +667,18 @@ class Pipette(AbstractInstrument[PipetteConfigurations]):
         ):
             if not config:
                 continue
-            if count in config.current_by_tip_count:
+
+            if isinstance(config, PressFitPickUpTipConfiguration) and all(
+                [
+                    config.speed_by_tip_count.get(count),
+                    config.distance_by_tip_count.get(count),
+                    config.current_by_tip_count.get(count),
+                ]
+            ):
                 return config
+            elif config.current_by_tip_count.get(count) is not None:
+                return config
+
         raise CommandPreconditionViolated(
             message=f"No pick up tip configuration for {count} tips",
         )

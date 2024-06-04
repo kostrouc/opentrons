@@ -1,5 +1,5 @@
-import { Mount } from '@opentrons/components'
-import {
+import type { Mount } from '@opentrons/components'
+import type {
   ModuleType,
   ModuleModel,
   MAGNETIC_MODULE_TYPE,
@@ -9,9 +9,9 @@ import {
   MAGNETIC_BLOCK_TYPE,
   NozzleConfigurationStyle,
 } from '@opentrons/shared-data'
-import { DeckSlot } from '../types'
+import type { DeckSlot } from '../types'
 
-import {
+import type {
   TemperatureStatus,
   ModuleEntity,
   PipetteEntity,
@@ -19,8 +19,8 @@ import {
   AdditionalEquipmentEntity,
 } from '@opentrons/step-generation'
 export interface FormPipette {
-  pipetteName: string | null | undefined
-  tiprackDefURI: string | null | undefined
+  pipetteName?: string | null
+  tiprackDefURI?: string[] | null
 }
 export interface FormPipettesByMount {
   left: FormPipette
@@ -28,11 +28,11 @@ export interface FormPipettesByMount {
 }
 // =========== MODULES ========
 export interface FormModule {
-  onDeck: boolean
-  model: ModuleModel | null
+  model: ModuleModel
+  type: ModuleType
   slot: DeckSlot
 }
-export type FormModulesByType = Record<ModuleType, FormModule>
+export type FormModules = Record<number, FormModule>
 export type ModuleEntities = Record<string, ModuleEntity>
 // NOTE: semi-redundant 'type' key in FooModuleState types is required for Flow to disambiguate 'moduleState'
 export interface MagneticModuleState {
@@ -72,7 +72,7 @@ export interface ModuleTemporalProperties {
 }
 export type ModuleOnDeck = ModuleEntity & ModuleTemporalProperties
 export type ModulesForEditModulesCard = Partial<
-  Record<ModuleType, ModuleOnDeck | null | undefined>
+  Record<ModuleType, ModuleOnDeck[] | null | undefined>
 >
 // =========== LABWARE ========
 export type NormalizedLabwareById = Record<

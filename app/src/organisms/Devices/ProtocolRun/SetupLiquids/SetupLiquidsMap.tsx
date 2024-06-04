@@ -21,21 +21,17 @@ import {
   THERMOCYCLER_MODULE_V1,
 } from '@opentrons/shared-data'
 
-import { useAttachedModules } from '../../hooks'
 import { LabwareInfoOverlay } from '../LabwareInfoOverlay'
 import { LiquidsLabwareDetailsModal } from './LiquidsLabwareDetailsModal'
 import { getWellFillFromLabwareId } from './utils'
 import { getLabwareRenderInfo } from '../utils/getLabwareRenderInfo'
 import { getStandardDeckViewLayerBlockList } from '../utils/getStandardDeckViewLayerBlockList'
-import { getAttachedProtocolModuleMatches } from '../../../ProtocolSetupModulesAndDeck/utils'
 import { getProtocolModulesInfo } from '../utils/getProtocolModulesInfo'
 
 import type {
   CompletedProtocolAnalysis,
   ProtocolAnalysisOutput,
 } from '@opentrons/shared-data'
-
-const ATTACHED_MODULE_POLL_MS = 5000
 
 interface SetupLiquidsMapProps {
   runId: string
@@ -50,10 +46,6 @@ export function SetupLiquidsMap(
   const [liquidDetailsLabwareId, setLiquidDetailsLabwareId] = React.useState<
     string | null
   >(null)
-  const attachedModules =
-    useAttachedModules({
-      refetchInterval: ATTACHED_MODULE_POLL_MS,
-    }) ?? []
 
   if (protocolAnalysis == null) return null
 
@@ -75,12 +67,7 @@ export function SetupLiquidsMap(
 
   const protocolModulesInfo = getProtocolModulesInfo(protocolAnalysis, deckDef)
 
-  const attachedProtocolModuleMatches = getAttachedProtocolModuleMatches(
-    attachedModules,
-    protocolModulesInfo
-  )
-
-  const modulesOnDeck = attachedProtocolModuleMatches.map(module => {
+  const modulesOnDeck = protocolModulesInfo.map(module => {
     const labwareInAdapterInMod =
       module.nestedLabwareId != null
         ? initialLoadedLabwareByAdapter[module.nestedLabwareId]
@@ -95,7 +82,7 @@ export function SetupLiquidsMap(
       labwareInAdapterInMod?.params.displayName ??
       module.nestedLabwareDisplayName
     const nestedLabwareWellFill = getWellFillFromLabwareId(
-      module.nestedLabwareId ?? '',
+      topLabwareId ?? '',
       liquids,
       labwareByLiquidId
     )
@@ -123,7 +110,6 @@ export function SetupLiquidsMap(
           >
             <LabwareInfoOverlay
               definition={topLabwareDefinition}
-              // TODO(bh, 2023-11-09): pass hover to labware render in BaseDeck
               hover={topLabwareId === hoverLabwareId && labwareHasLiquid}
               labwareHasLiquid={labwareHasLiquid}
               labwareId={topLabwareId}

@@ -1,6 +1,4 @@
-import assert from 'assert'
 import { handleActions } from 'redux-actions'
-import { Reducer } from 'redux'
 import mapValues from 'lodash/mapValues'
 import cloneDeep from 'lodash/cloneDeep'
 import merge from 'lodash/merge'
@@ -13,21 +11,12 @@ import {
   getLabwareDefaultEngageHeight,
   getLabwareDefURI,
   getModuleType,
-  LoadLabwareCreateCommand,
-  LoadModuleCreateCommand,
-  LoadPipetteCreateCommand,
-  MoveLabwareCreateCommand,
-  MoveToAddressableAreaCreateCommand,
-  MoveToAddressableAreaForDropTipCreateCommand,
   MAGNETIC_MODULE_TYPE,
   MAGNETIC_MODULE_V1,
-  PipetteName,
   THERMOCYCLER_MODULE_TYPE,
   WASTE_CHUTE_ADDRESSABLE_AREAS,
-  AddressableAreaName,
   MOVABLE_TRASH_ADDRESSABLE_AREAS,
 } from '@opentrons/shared-data'
-import type { RootState as LabwareDefsRootState } from '../../labware-defs'
 import { rootReducer as labwareDefsRootReducer } from '../../labware-defs'
 import { getCutoutIdByAddressableArea, uuid } from '../../utils'
 import { INITIAL_DECK_SETUP_STEP_ID, SPAN7_8_10_11_SLOT } from '../../constants'
@@ -45,30 +34,45 @@ import {
 import { getLabwareOnModule } from '../../ui/modules/utils'
 import { nestedCombineReducers } from './nestedCombineReducers'
 import { PROFILE_CYCLE, PROFILE_STEP } from '../../form-types'
-import {
-  COLUMN_4_SLOTS,
-  NormalizedAdditionalEquipmentById,
-  NormalizedPipetteById,
-} from '@opentrons/step-generation'
-import { LoadFileAction } from '../../load-file'
-import { SaveStepFormAction } from '../../ui/steps/actions/thunks'
-import { ReplaceCustomLabwareDef } from '../../labware-defs/actions'
+import { COLUMN_4_SLOTS } from '@opentrons/step-generation'
 import {
   _getPipetteEntitiesRootState,
   _getLabwareEntitiesRootState,
   _getInitialDeckSetupRootState,
+  _getAdditionalEquipmentEntitiesRootState,
 } from '../selectors'
-import {
-  CreateDeckFixtureAction,
-  DeleteDeckFixtureAction,
-  ToggleIsGripperRequiredAction,
-} from '../actions/additionalItems'
 import {
   createPresavedStepForm,
   getDeckItemIdInSlot,
   getIdsInRange,
+  getUnoccupiedSlotForMoveableTrash,
 } from '../utils'
-import {
+
+import type { Reducer } from 'redux'
+import type {
+  NormalizedAdditionalEquipmentById,
+  NormalizedPipetteById,
+} from '@opentrons/step-generation'
+import type {
+  LoadLabwareCreateCommand,
+  LoadModuleCreateCommand,
+  LoadPipetteCreateCommand,
+  MoveLabwareCreateCommand,
+  MoveToAddressableAreaCreateCommand,
+  MoveToAddressableAreaForDropTipCreateCommand,
+  PipetteName,
+  AddressableAreaName,
+} from '@opentrons/shared-data'
+import type { RootState as LabwareDefsRootState } from '../../labware-defs'
+import type { LoadFileAction } from '../../load-file'
+import type { SaveStepFormAction } from '../../ui/steps/actions/thunks'
+import type { ReplaceCustomLabwareDef } from '../../labware-defs/actions'
+import type {
+  CreateDeckFixtureAction,
+  DeleteDeckFixtureAction,
+  ToggleIsGripperRequiredAction,
+} from '../actions/additionalItems'
+import type {
   CreateModuleAction,
   CreatePipettesAction,
   DeleteModuleAction,
@@ -190,6 +194,9 @@ export const unsavedForm = (
         orderedStepIds: rootState.orderedStepIds,
         initialDeckSetup: _getInitialDeckSetupRootState(rootState),
         robotStateTimeline: action.meta.robotStateTimeline,
+        additionalEquipmentEntities: _getAdditionalEquipmentEntitiesRootState(
+          rootState
+        ),
       })
     }
 
@@ -530,7 +537,7 @@ export const _editModuleFormUpdate = ({
         ? getLabwareDefaultEngageHeight(labwareEntity.def)
         : null
       const moduleEntity = initialDeckSetup.modules[moduleId]
-      assert(
+      console.assert(
         moduleEntity,
         `editModuleFormUpdate expected moduleEntity for module ${moduleId}`
       )
@@ -614,7 +621,7 @@ export const savedStepForms = (
         action.type === 'CREATE_CONTAINER'
           ? action.payload.id
           : action.payload.duplicateLabwareId
-      assert(
+      console.assert(
         prevInitialDeckSetupStep,
         'expected initial deck setup step to exist, could not handle CREATE_CONTAINER'
       )
@@ -940,7 +947,7 @@ export const savedStepForms = (
       const { stepId } = action.payload
 
       if (stepId == null) {
-        assert(
+        console.assert(
           false,
           `savedStepForms got CHANGE_SAVED_STEP_FORM action without a stepId`
         )
@@ -1022,7 +1029,7 @@ export const savedStepForms = (
           const defaults = getDefaultsForStepType(prevStepForm.stepType)
 
           if (!prevStepForm) {
-            assert(false, `expected stepForm for id ${stepId}`)
+            console.assert(false, `expected stepForm for id ${stepId}`)
             return acc
           }
 
@@ -1348,10 +1355,9 @@ export const additionalEquipmentInvariantProperties = handleActions<NormalizedAd
             command.params.newLocation !== 'offDeck' &&
             'addressableAreaName' in command.params.newLocation &&
             WASTE_CHUTE_ADDRESSABLE_AREAS.includes(
-              command.params.addressableAreaName
+              command.params.newLocation.addressableAreaName
             ))
       )
-
       const getStagingAreaSlotNames = (
         commandType: 'moveLabware' | 'loadLabware',
         locationKey: 'newLocation' | 'location'
@@ -1375,6 +1381,14 @@ export const additionalEquipmentInvariantProperties = handleActions<NormalizedAd
           ...getStagingAreaSlotNames('loadLabware', 'location'),
         ]),
       ]
+
+      const unoccupiedSlotForMovableTrash = hasWasteChuteCommands
+        ? ''
+        : getUnoccupiedSlotForMoveableTrash(
+            file,
+            hasWasteChuteCommands,
+            stagingAreaSlotNames
+          )
 
       const stagingAreas = stagingAreaSlotNames.reduce((acc, slot) => {
         const stagingAreaId = `${uuid()}:stagingArea`
@@ -1420,6 +1434,14 @@ export const additionalEquipmentInvariantProperties = handleActions<NormalizedAd
                   stepForm.blowout_location?.includes('trashBin'))
             )
           : null
+      const mixStepTrashBin =
+        savedStepForms != null
+          ? Object.values(savedStepForms).find(
+              stepForm =>
+                stepForm.stepType === 'mix' &&
+                stepForm.dropTip_location.includes('trashBin')
+            )
+          : null
 
       let trashBinId: string | null = null
       if (moveLiquidStepTrashBin != null) {
@@ -1438,8 +1460,9 @@ export const additionalEquipmentInvariantProperties = handleActions<NormalizedAd
         ) {
           trashBinId = moveLiquidStepTrashBin.blowOut_location
         }
+      } else if (mixStepTrashBin != null) {
+        trashBinId = mixStepTrashBin.dropTip_location
       }
-
       const trashCutoutId =
         trashAddressableAreaName != null
           ? getCutoutIdByAddressableArea(
@@ -1495,6 +1518,9 @@ export const additionalEquipmentInvariantProperties = handleActions<NormalizedAd
         ) {
           wasteChuteId = moveLiquidStepWasteChute.blowOut_location
         }
+        //  new wasteChuteId generated for if there are only moveLabware commands
+      } else if (hasWasteChuteCommands && moveLiquidStepWasteChute == null) {
+        wasteChuteId = `${uuid()}:wasteChute`
       }
 
       const wasteChute =
@@ -1518,16 +1544,68 @@ export const additionalEquipmentInvariantProperties = handleActions<NormalizedAd
           }
         : {}
 
+      const hardcodedTrashBinIdOt2 = `${uuid()}:fixedTrash`
+      const hardcodedTrashBinOt2 = {
+        [hardcodedTrashBinIdOt2]: {
+          name: 'trashBin' as const,
+          id: hardcodedTrashBinIdOt2,
+          location: getCutoutIdByAddressableArea(
+            'fixedTrash' as AddressableAreaName,
+            'fixedTrashSlot',
+            OT2_ROBOT_TYPE
+          ),
+        },
+      }
+      const hardcodedTrashAddressableAreaName = `movableTrash${unoccupiedSlotForMovableTrash}`
+      const hardcodedTrashBinIdFlex = `${uuid()}:${hardcodedTrashAddressableAreaName}`
+      const hardcodedTrashBinFlex = {
+        [hardcodedTrashBinIdFlex]: {
+          name: 'trashBin' as const,
+          id: hardcodedTrashBinIdFlex,
+          location: hasWasteChuteCommands
+            ? ''
+            : getCutoutIdByAddressableArea(
+                hardcodedTrashAddressableAreaName as AddressableAreaName,
+                'trashBinAdapter',
+                FLEX_ROBOT_TYPE
+              ),
+        },
+      }
       if (isFlex) {
-        return {
-          ...state,
-          ...gripper,
-          ...trashBin,
-          ...wasteChute,
-          ...stagingAreas,
+        if (trashBin != null) {
+          return {
+            ...state,
+            ...gripper,
+            ...trashBin,
+            ...wasteChute,
+            ...stagingAreas,
+          }
+        } else if (trashBin == null && !hasWasteChuteCommands) {
+          //  always hardcode a trash bin when no pipetting command is provided since return tip
+          //  is not supported
+          return {
+            ...state,
+            ...gripper,
+            ...hardcodedTrashBinFlex,
+            ...wasteChute,
+            ...stagingAreas,
+          }
+        } else {
+          return {
+            ...state,
+            ...gripper,
+            ...wasteChute,
+            ...stagingAreas,
+          }
         }
       } else {
-        return { ...state, ...trashBin }
+        if (trashBin != null) {
+          return { ...state, ...trashBin }
+        } else {
+          //  always hardcode a trash bin when no pipetting command is provided since no trash for
+          //  OT-2 is not supported
+          return { ...state, ...hardcodedTrashBinOt2 }
+        }
       }
     },
 

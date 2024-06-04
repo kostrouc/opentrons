@@ -11,21 +11,16 @@ import {
   OT2_STANDARD_MODEL,
   FLEX_STANDARD_DECKID,
   SPAN7_8_10_11_SLOT,
-  LabwareLocation,
 } from '@opentrons/shared-data'
+
+import { COLUMN_4_SLOTS } from '@opentrons/step-generation'
 import { selectors as dismissSelectors } from '../../dismiss'
-import {
-  selectors as labwareDefSelectors,
-  LabwareDefByDefURI,
-} from '../../labware-defs'
+import { selectors as labwareDefSelectors } from '../../labware-defs'
 import { uuid } from '../../utils'
 import { selectors as ingredSelectors } from '../../labware-ingred/selectors'
 import { selectors as stepFormSelectors } from '../../step-forms'
 import { selectors as uiLabwareSelectors } from '../../ui/labware'
-import {
-  DesignerApplicationData,
-  getLoadLiquidCommands,
-} from '../../load-file/migration/utils/getLoadLiquidCommands'
+import { getLoadLiquidCommands } from '../../load-file/migration/utils/getLoadLiquidCommands'
 import { swatchColors } from '../../components/swatchColors'
 import {
   DEFAULT_MM_FROM_BOTTOM_ASPIRATE,
@@ -36,14 +31,15 @@ import {
 import { getFileMetadata, getRobotType } from './fileFields'
 import { getInitialRobotState, getRobotStateTimeline } from './commands'
 
-import {
+import type {
   PipetteEntity,
   LabwareEntities,
   PipetteEntities,
   RobotState,
-  COLUMN_4_SLOTS,
 } from '@opentrons/step-generation'
 import type {
+  LabwareLocation,
+  AddressableAreaName,
   CommandAnnotationV1Mixin,
   CommandV8Mixin,
   CreateCommand,
@@ -58,10 +54,12 @@ import type {
   ProtocolBase,
   ProtocolFile,
 } from '@opentrons/shared-data'
+import type { LabwareDefByDefURI } from '../../labware-defs'
 import type { Selector } from '../../types'
+import type { DesignerApplicationData } from '../../load-file/migration/utils/getLoadLiquidCommands'
 
 // TODO: BC: 2018-02-21 uncomment this assert, causes test failures
-// assert(!isEmpty(process.env.OT_PD_VERSION), 'Could not find application version!')
+// console.assert(!isEmpty(process.env.OT_PD_VERSION), 'Could not find application version!')
 if (isEmpty(process.env.OT_PD_VERSION))
   console.warn('Could not find application version!')
 const applicationVersion: string = process.env.OT_PD_VERSION || ''
@@ -83,7 +81,7 @@ export const getLabwareDefinitionsInUse = (
   )
   const tiprackDefURIsInUse: string[] = Object.keys(pipettes)
     .map(id => pipettes[id])
-    .map((pipetteEntity: PipetteEntity) => pipetteEntity.tiprackDefURI)
+    .flatMap((pipetteEntity: PipetteEntity) => pipetteEntity.tiprackDefURI)
   const labwareDefURIsInUse = uniq([
     ...tiprackDefURIsInUse,
     ...labwareDefURIsOnDeck,
@@ -154,9 +152,8 @@ export const createFile: Selector<ProtocolFile> = createSelector(
         },
         pipetteTiprackAssignments: mapValues(
           pipetteEntities,
-          (
-            p: typeof pipetteEntities[keyof typeof pipetteEntities]
-          ): string | null | undefined => p.tiprackDefURI
+          (p: typeof pipetteEntities[keyof typeof pipetteEntities]): string[] =>
+            p.tiprackDefURI
         ),
         dismissedWarnings,
         ingredients,
@@ -281,7 +278,10 @@ export const createFile: Selector<ProtocolFile> = createSelector(
         } else if (isOnAdapter) {
           location = { labwareId: labware.slot }
         } else if (isAddressableAreaName) {
-          location = { addressableAreaName: labware.slot }
+          // TODO(bh, 2024-01-02): check slots against addressable areas via the deck definition
+          location = {
+            addressableAreaName: labware.slot as AddressableAreaName,
+          }
         } else if (labware.slot === 'offDeck') {
           location = 'offDeck'
         }

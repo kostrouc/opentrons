@@ -1,24 +1,23 @@
 import * as React from 'react'
-import { when, resetAllWhenMocks } from 'jest-when'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from 'react-query'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import {
   createSession,
-  CreateSessionData,
   SESSION_TYPE_DECK_CALIBRATION,
 } from '@opentrons/api-client'
 import { useHost } from '../../api'
 import { useCreateSessionMutation } from '..'
 
-import type { HostConfig, Response, Session } from '@opentrons/api-client'
+import type {
+  HostConfig,
+  Response,
+  Session,
+  CreateSessionData,
+} from '@opentrons/api-client'
 
-jest.mock('@opentrons/api-client')
-jest.mock('../../api/useHost')
-
-const mockCreateSession = createSession as jest.MockedFunction<
-  typeof createSession
->
-const mockUseHost = useHost as jest.MockedFunction<typeof useHost>
+vi.mock('@opentrons/api-client')
+vi.mock('../../api/useHost')
 
 const HOST_CONFIG: HostConfig = { hostname: 'localhost' }
 const SESSION_ID = '1'
@@ -41,15 +40,10 @@ describe('useCreateSessionMutation hook', () => {
 
     wrapper = clientProvider
   })
-  afterEach(() => {
-    resetAllWhenMocks()
-  })
 
   it('should return no data when calling createSession if the request fails', async () => {
-    when(mockUseHost).calledWith().mockReturnValue(HOST_CONFIG)
-    when(mockCreateSession)
-      .calledWith(HOST_CONFIG, createSessionData)
-      .mockRejectedValue('oh no')
+    vi.mocked(useHost).mockReturnValue(HOST_CONFIG)
+    vi.mocked(createSession).mockRejectedValue('oh no')
 
     const { result } = renderHook(
       () => useCreateSessionMutation(createSessionData),
@@ -66,10 +60,10 @@ describe('useCreateSessionMutation hook', () => {
   })
 
   it('should create a session when calling the createSession callback', async () => {
-    when(mockUseHost).calledWith().mockReturnValue(HOST_CONFIG)
-    when(mockCreateSession)
-      .calledWith(HOST_CONFIG, createSessionData)
-      .mockResolvedValue({ data: SESSION_RESPONSE } as Response<Session>)
+    vi.mocked(useHost).mockReturnValue(HOST_CONFIG)
+    vi.mocked(createSession).mockResolvedValue({
+      data: SESSION_RESPONSE,
+    } as Response<Session>)
 
     const { result } = renderHook(
       () => useCreateSessionMutation(createSessionData),

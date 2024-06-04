@@ -1,4 +1,3 @@
-import * as React from 'react'
 import { getWellRatio } from '../utils'
 import { canPipetteUseLabware } from '../../utils'
 import { MAGNETIC_MODULE_V1, MAGNETIC_MODULE_V2 } from '@opentrons/shared-data'
@@ -13,8 +12,9 @@ import {
   PAUSE_UNTIL_TEMP,
   THERMOCYCLER_PROFILE,
 } from '../../constants'
-import { StepFieldName } from '../../form-types'
-
+import type * as React from 'react'
+import type { StepFieldName } from '../../form-types'
+import type { LabwareEntities } from '@opentrons/step-generation'
 /*******************
  ** Error Messages **
  ********************/
@@ -136,7 +136,10 @@ interface HydratedFormData {
   [key: string]: any
 }
 
-export type FormErrorChecker = (arg: HydratedFormData) => FormError | null
+export type FormErrorChecker = (
+  arg: HydratedFormData,
+  labwareEntities?: LabwareEntities
+) => FormError | null
 // TODO: test these
 
 /*******************
@@ -235,11 +238,18 @@ export const wellRatioMoveLiquid = (
     ? null
     : wellRatioFormError
 }
-export const volumeTooHigh = (fields: HydratedFormData): FormError | null => {
-  const { pipette } = fields
+export const volumeTooHigh = (
+  fields: HydratedFormData,
+  labwareEntities?: LabwareEntities
+): FormError | null => {
+  const { pipette, tipRack } = fields
   const volume = Number(fields.volume)
-  const pipetteCapacity = getPipetteCapacity(pipette)
 
+  const pipetteCapacity = getPipetteCapacity(
+    pipette,
+    labwareEntities ?? {},
+    tipRack
+  )
   if (
     !Number.isNaN(volume) &&
     !Number.isNaN(pipetteCapacity) &&

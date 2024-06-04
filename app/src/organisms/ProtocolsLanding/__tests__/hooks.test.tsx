@@ -2,13 +2,15 @@ import * as React from 'react'
 import { Provider } from 'react-redux'
 import { createStore } from 'redux'
 import { renderHook } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+
 import { FLEX_ROBOT_TYPE, OT2_ROBOT_TYPE } from '@opentrons/shared-data'
 
 import { useSortedProtocols } from '../hooks'
-import { StoredProtocolData } from '../../../redux/protocol-storage'
 
 import type { Store } from 'redux'
 import type { ProtocolAnalysisOutput } from '@opentrons/shared-data'
+import type { StoredProtocolData } from '../../../redux/protocol-storage'
 import type { State } from '../../../redux/types'
 
 const mockStoredProtocolData = [
@@ -95,6 +97,7 @@ const mockStoredProtocolData = [
           displayColor: '#ff4f4f',
         },
       ],
+      runTimeParameters: [],
       errors: [],
     } as ProtocolAnalysisOutput,
   },
@@ -181,6 +184,7 @@ const mockStoredProtocolData = [
           displayColor: '#ff4f4f',
         },
       ],
+      runTimeParameters: [],
       errors: [],
     } as ProtocolAnalysisOutput,
   },
@@ -271,18 +275,19 @@ const mockStoredProtocolData = [
           displayColor: '#ff4f4f',
         },
       ],
+      runTimeParameters: [],
       errors: [],
     } as ProtocolAnalysisOutput,
   },
 ] as StoredProtocolData[]
 
 describe('useSortedProtocols', () => {
-  const store: Store<State> = createStore(jest.fn(), {})
+  const store: Store<State> = createStore(vi.fn(), {})
   beforeEach(() => {
-    store.dispatch = jest.fn()
+    store.dispatch = vi.fn()
   })
   afterEach(() => {
-    jest.restoreAllMocks()
+    vi.restoreAllMocks()
   })
 
   it('should return an object with protocols sorted alphabetically', () => {

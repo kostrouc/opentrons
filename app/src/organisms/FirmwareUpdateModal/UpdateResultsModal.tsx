@@ -1,6 +1,5 @@
 import * as React from 'react'
 import { useTranslation, Trans } from 'react-i18next'
-import { getPipetteModelSpecs } from '@opentrons/shared-data'
 import {
   ALIGN_CENTER,
   BORDERS,
@@ -9,13 +8,14 @@ import {
   Flex,
   Icon,
   SPACING,
+  StyledText,
   TYPOGRAPHY,
 } from '@opentrons/components'
 import { SmallButton } from '../../atoms/buttons'
-import { StyledText } from '../../atoms/text'
 import { Modal } from '../../molecules/Modal'
+import { usePipetteModelSpecs } from '../../resources/instruments/hooks'
 
-import type { InstrumentData } from '@opentrons/api-client'
+import type { InstrumentData, PipetteData } from '@opentrons/api-client'
 import type { ModalHeaderBaseProps } from '../../molecules/Modal/types'
 
 interface UpdateResultsModalProps {
@@ -29,19 +29,23 @@ export function UpdateResultsModal(
   props: UpdateResultsModalProps
 ): JSX.Element {
   const { isSuccess, shouldExit, onClose, instrument } = props
-  const { i18n, t } = useTranslation(['firmware_update', 'shared'])
+  const { i18n, t } = useTranslation(['firmware_update', 'shared', 'branded'])
 
   const updateFailedHeader: ModalHeaderBaseProps = {
     title: t('update_failed'),
     iconName: 'ot-alert',
-    iconColor: COLORS.red2,
+    iconColor: COLORS.red50,
   }
+
+  const pipetteDisplayName = usePipetteModelSpecs(
+    (instrument as PipetteData)?.instrumentModel
+  )?.displayName
+
   let instrumentName = 'instrument'
   if (instrument?.ok) {
     instrumentName =
       instrument?.instrumentType === 'pipette'
-        ? getPipetteModelSpecs(instrument.instrumentModel)?.displayName ??
-          'pipette'
+        ? pipetteDisplayName ?? 'pipette'
         : 'Flex Gripper'
   }
   return (
@@ -50,7 +54,7 @@ export function UpdateResultsModal(
         <Modal header={updateFailedHeader}>
           <Flex flexDirection={DIRECTION_COLUMN}>
             <StyledText as="p" marginBottom={SPACING.spacing32}>
-              {t('download_logs')}
+              {t('branded:firmware_update_download_logs')}
             </StyledText>
             <SmallButton
               onClick={onClose}
@@ -75,16 +79,16 @@ export function UpdateResultsModal(
             <Flex
               height="11.5rem"
               width="100%"
-              backgroundColor={COLORS.green3}
-              borderRadius={BORDERS.borderRadiusSize3}
+              backgroundColor={COLORS.green35}
+              borderRadius={BORDERS.borderRadius12}
               flexDirection={DIRECTION_COLUMN}
-              color={COLORS.darkBlack90}
+              color={COLORS.grey60}
               padding={SPACING.spacing24}
               alignItems={ALIGN_CENTER}
             >
               <Icon
                 name="ot-check"
-                color={COLORS.green2}
+                color={COLORS.green50}
                 size="2.5rem"
                 marginBottom={SPACING.spacing16}
               />

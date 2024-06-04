@@ -15,7 +15,7 @@ from typing import (
     Union,
 )
 
-from opentrons_shared_data.deck.dev_types import DeckDefinitionV4
+from opentrons_shared_data.deck.dev_types import DeckDefinitionV5
 from opentrons_shared_data.gripper.constants import LABWARE_GRIP_FORCE
 from opentrons_shared_data.labware.labware_definition import LabwareRole
 from opentrons_shared_data.pipette.dev_types import LabwareUri
@@ -31,6 +31,7 @@ from ..commands import (
     Command,
     LoadLabwareResult,
     MoveLabwareResult,
+    ReloadLabwareResult,
 )
 from ..types import (
     DeckSlotLocation,
@@ -52,7 +53,7 @@ from ..types import (
 )
 from ..actions import (
     Action,
-    UpdateCommandAction,
+    SucceedCommandAction,
     AddLabwareOffsetAction,
     AddLabwareDefinitionAction,
 )
@@ -106,7 +107,7 @@ class LabwareState:
     labware_offsets_by_id: Dict[str, LabwareOffset]
 
     definitions_by_uri: Dict[str, LabwareDefinition]
-    deck_definition: DeckDefinitionV4
+    deck_definition: DeckDefinitionV5
 
 
 class LabwareStore(HasState[LabwareState], HandlesActions):
@@ -116,7 +117,7 @@ class LabwareStore(HasState[LabwareState], HandlesActions):
 
     def __init__(
         self,
-        deck_definition: DeckDefinitionV4,
+        deck_definition: DeckDefinitionV5,
         deck_fixed_labware: Sequence[DeckFixedLabware],
     ) -> None:
         """Initialize a labware store and its state."""
@@ -152,7 +153,7 @@ class LabwareStore(HasState[LabwareState], HandlesActions):
 
     def handle_action(self, action: Action) -> None:
         """Modify state in reaction to an action."""
-        if isinstance(action, UpdateCommandAction):
+        if isinstance(action, SucceedCommandAction):
             self._handle_command(action.command)
 
         elif isinstance(action, AddLabwareOffsetAction):
@@ -187,17 +188,26 @@ class LabwareStore(HasState[LabwareState], HandlesActions):
             )
 
             self._state.definitions_by_uri[definition_uri] = command.result.definition
+            if isinstance(command.result, LoadLabwareResult):
+                location = command.params.location
+            else:
+                location = self._state.labware_by_id[command.result.labwareId].location
 
             self._state.labware_by_id[
                 command.result.labwareId
             ] = LoadedLabware.construct(
                 id=command.result.labwareId,
-                location=command.params.location,
+                location=location,
                 loadName=command.result.definition.parameters.loadName,
                 definitionUri=definition_uri,
                 offsetId=command.result.offsetId,
                 displayName=command.params.displayName,
             )
+
+        elif isinstance(command.result, ReloadLabwareResult):
+            labware_id = command.params.labwareId
+            new_offset_id = command.result.offsetId
+            self._state.labware_by_id[labware_id].offsetId = new_offset_id
 
         elif isinstance(command.result, MoveLabwareResult):
             labware_id = command.params.labwareId
@@ -324,7 +334,7 @@ class LabwareView(HasState[LabwareState]):
             or self.get_definition(labware_id).metadata.displayName
         )
 
-    def get_deck_definition(self) -> DeckDefinitionV4:
+    def get_deck_definition(self) -> DeckDefinitionV5:
         """Get the current deck definition."""
         return self._state.deck_definition
 
@@ -832,3 +842,87 @@ class LabwareView(HasState[LabwareState]):
             if recommended_height is not None
             else self.get_dimensions(labware_id).z / 2
         )
+
+    @staticmethod
+    def _max_x_of_well(well_defn: WellDefinition) -> float:
+        if well_defn.shape == "rectangular":
+            return well_defn.x + (well_defn.xDimension or 0) / 2
+        elif well_defn.shape == "circular":
+            return well_defn.x + (well_defn.diameter or 0) / 2
+        else:
+            return well_defn.x
+
+    @staticmethod
+    def _min_x_of_well(well_defn: WellDefinition) -> float:
+        if well_defn.shape == "rectangular":
+            return well_defn.x - (well_defn.xDimension or 0) / 2
+        elif well_defn.shape == "circular":
+            return well_defn.x - (well_defn.diameter or 0) / 2
+        else:
+            return 0
+
+    @staticmethod
+    def _max_y_of_well(well_defn: WellDefinition) -> float:
+        if well_defn.shape == "rectangular":
+            return well_defn.y + (well_defn.yDimension or 0) / 2
+        elif well_defn.shape == "circular":
+            return well_defn.y + (well_defn.diameter or 0) / 2
+        else:
+            return 0
+
+    @staticmethod
+    def _min_y_of_well(well_defn: WellDefinition) -> float:
+        if well_defn.shape == "rectangular":
+            return well_defn.y - (well_defn.yDimension or 0) / 2
+        elif well_defn.shape == "circular":
+            return well_defn.y - (well_defn.diameter or 0) / 2
+        else:
+            return 0
+
+    @staticmethod
+    def _max_z_of_well(well_defn: WellDefinition) -> float:
+        return well_defn.z + well_defn.depth
+
+    def get_well_bbox(self, labware_id: str) -> Dimensions:
+        """Get the bounding box implied by the wells.
+
+        The bounding box of the labware that is implied by the wells is that required
+        to contain the bounds of the wells - the y-span from the min-y bound of the min-y
+        well to the max-y bound of the max-y well, x ditto, z from labware 0 to the max-z
+        well top.
+
+        This is used for the specific purpose of finding the reasonable uncertainty bounds of
+        where and how a gripper will interact with a labware.
+        """
+        defn = self.get_definition(labware_id)
+        max_x: Optional[float] = None
+        min_x: Optional[float] = None
+        max_y: Optional[float] = None
+        min_y: Optional[float] = None
+        max_z: Optional[float] = None
+
+        for well in defn.wells.values():
+            well_max_x = self._max_x_of_well(well)
+            well_min_x = self._min_x_of_well(well)
+            well_max_y = self._max_y_of_well(well)
+            well_min_y = self._min_y_of_well(well)
+            well_max_z = self._max_z_of_well(well)
+            if (max_x is None) or (well_max_x > max_x):
+                max_x = well_max_x
+            if (max_y is None) or (well_max_y > max_y):
+                max_y = well_max_y
+            if (min_x is None) or (well_min_x < min_x):
+                min_x = well_min_x
+            if (min_y is None) or (well_min_y < min_y):
+                min_y = well_min_y
+            if (max_z is None) or (well_max_z > max_z):
+                max_z = well_max_z
+        if (
+            max_x is None
+            or max_y is None
+            or min_x is None
+            or min_y is None
+            or max_z is None
+        ):
+            return Dimensions(0, 0, 0)
+        return Dimensions(max_x - min_x, max_y - min_y, max_z)

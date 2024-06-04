@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from typing import Optional, TYPE_CHECKING, cast, Union
+from opentrons.protocols.api_support.types import APIVersion
 
 from opentrons.types import Location, Mount
 from opentrons.hardware_control import SyncHardwareAPI
@@ -32,16 +33,19 @@ from opentrons.protocols.api_support.definitions import MAX_SUPPORTED_VERSION
 from opentrons_shared_data.pipette.dev_types import PipetteNameType
 from opentrons.protocol_api._nozzle_layout import NozzleLayout
 from opentrons.hardware_control.nozzle_manager import NozzleConfigurationType
+from opentrons.hardware_control.nozzle_manager import NozzleMap
 from . import deck_conflict
 
 from ..instrument import AbstractInstrument
 from .well import WellCore
 
-from ..._trash_bin import TrashBin
-from ..._waste_chute import WasteChute
+from ...disposal_locations import TrashBin, WasteChute
 
 if TYPE_CHECKING:
     from .protocol import ProtocolCore
+
+
+_DISPENSE_VOLUME_VALIDATION_ADDED_IN = APIVersion(2, 17)
 
 
 class InstrumentCore(AbstractInstrument[WellCore]):
@@ -180,6 +184,15 @@ class InstrumentCore(AbstractInstrument[WellCore]):
             in_place: whether this is a in-place command.
             push_out: The amount to push the plunger below bottom position.
         """
+        if self._protocol_core.api_version < _DISPENSE_VOLUME_VALIDATION_ADDED_IN:
+            # In older API versions, when you try to dispense more than you can,
+            # it gets clamped.
+            volume = min(volume, self.get_current_volume())
+        else:
+            # Newer API versions raise an error if you try to dispense more than
+            # you can. Let the error come from Protocol Engine's validation.
+            pass
+
         if well_core is None:
             if not in_place:
                 if isinstance(location, (TrashBin, WasteChute)):
@@ -395,13 +408,18 @@ class InstrumentCore(AbstractInstrument[WellCore]):
             well_name=well_name,
             well_location=well_location,
         )
-        self._engine_client.pick_up_tip(
+
+        self._engine_client.pick_up_tip_wait_for_recovery(
             pipette_id=self._pipette_id,
             labware_id=labware_id,
             well_name=well_name,
             well_location=well_location,
         )
 
+        # Set the "last location" unconditionally, even if the command failed
+        # and was recovered from and we don't know if the pipette is physically here.
+        # This isn't used for path planning, but rather for implicit destination
+        # selection like in `pipette.aspirate(location=None)`.
         self._protocol_core.set_last_location(location=location, mount=self.get_mount())
 
     def drop_tip(
@@ -465,13 +483,16 @@ class InstrumentCore(AbstractInstrument[WellCore]):
         self._protocol_core.set_last_location(location=location, mount=self.get_mount())
 
     def drop_tip_in_disposal_location(
-        self, disposal_location: Union[TrashBin, WasteChute], home_after: Optional[bool]
+        self,
+        disposal_location: Union[TrashBin, WasteChute],
+        home_after: Optional[bool],
+        alternate_tip_drop: bool = False,
     ) -> None:
         self._move_to_disposal_location(
             disposal_location,
             force_direct=False,
             speed=None,
-            alternate_tip_drop=True,
+            alternate_tip_drop=alternate_tip_drop,
         )
         self._drop_tip_in_place(home_after=home_after)
         self._protocol_core.set_last_location(location=None, mount=self.get_mount())
@@ -485,10 +506,14 @@ class InstrumentCore(AbstractInstrument[WellCore]):
     ) -> None:
         # TODO (nd, 2023-11-30): give appropriate offset when finalized
         # https://opentrons.atlassian.net/browse/RSS-391
-        offset = AddressableOffsetVector(x=0, y=0, z=0)
+
+        disposal_offset = disposal_location.offset
+        offset = AddressableOffsetVector(
+            x=disposal_offset.x, y=disposal_offset.y, z=disposal_offset.z
+        )
 
         if isinstance(disposal_location, TrashBin):
-            addressable_area_name = disposal_location._addressable_area_name
+            addressable_area_name = disposal_location.area_name
             self._engine_client.move_to_addressable_area_for_drop_tip(
                 pipette_id=self._pipette_id,
                 addressable_area_name=addressable_area_name,
@@ -497,6 +522,7 @@ class InstrumentCore(AbstractInstrument[WellCore]):
                 speed=speed,
                 minimum_z_height=None,
                 alternate_drop_location=alternate_tip_drop,
+                ignore_tip_configuration=True,
             )
 
         if isinstance(disposal_location, WasteChute):
@@ -655,6 +681,9 @@ class InstrumentCore(AbstractInstrument[WellCore]):
             self._pipette_id
         )
 
+    def get_nozzle_map(self) -> NozzleMap:
+        return self._engine_client.state.tips.get_pipette_nozzle_map(self._pipette_id)
+
     def has_tip(self) -> bool:
         return (
             self._engine_client.state.pipettes.get_attached_tip(self._pipette_id)
@@ -689,14 +718,9 @@ class InstrumentCore(AbstractInstrument[WellCore]):
             return True
         else:
             if self.get_channels() == 96:
-                # SINGLE configuration with H12 nozzle is technically supported by the
-                # current tip tracking implementation but we don't do any deck conflict
-                # checks for it, so we won't provide full support for it yet.
-                return (
-                    self.get_nozzle_configuration() == NozzleConfigurationType.COLUMN
-                    and primary_nozzle == "A12"
-                )
+                return True
             if self.get_channels() == 8:
+                # TODO: (cb, 03/06/24): Enable automatic tip tracking on the 8 channel pipettes once PAPI support exists
                 return (
                     self.get_nozzle_configuration() == NozzleConfigurationType.SINGLE
                     and primary_nozzle == "H1"
@@ -733,7 +757,6 @@ class InstrumentCore(AbstractInstrument[WellCore]):
         primary_nozzle: Optional[str],
         front_right_nozzle: Optional[str],
     ) -> None:
-
         if style == NozzleLayout.COLUMN:
             configuration_model: NozzleLayoutConfigurationType = (
                 ColumnNozzleLayoutConfiguration(
@@ -759,3 +782,8 @@ class InstrumentCore(AbstractInstrument[WellCore]):
         self._engine_client.configure_nozzle_layout(
             pipette_id=self._pipette_id, configuration_params=configuration_model
         )
+
+    def retract(self) -> None:
+        """Retract this instrument to the top of the gantry."""
+        z_axis = self._engine_client.state.pipettes.get_z_axis(self._pipette_id)
+        self._engine_client.home([z_axis])

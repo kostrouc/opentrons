@@ -11,8 +11,10 @@ from opentrons.protocol_engine import (
     commands as pe_commands,
     errors as pe_errors,
 )
+from opentrons.protocol_engine.types import RunTimeParameter, BooleanParameter
 from opentrons.protocol_runner import RunResult, JsonRunner, PythonAndLegacyRunner
 
+from robot_server.service.notifications import RunsPublisher
 from robot_server.service.task_runner import TaskRunner
 from robot_server.runs.action_models import RunAction, RunActionType
 from robot_server.runs.engine_store import EngineStore
@@ -40,6 +42,12 @@ def mock_task_runner(decoy: Decoy) -> TaskRunner:
     return decoy.mock(cls=TaskRunner)
 
 
+@pytest.fixture()
+def mock_runs_publisher(decoy: Decoy) -> RunsPublisher:
+    """Get a mock RunsPublisher."""
+    return decoy.mock(cls=RunsPublisher)
+
+
 @pytest.fixture
 def run_id() -> str:
     """A run identifier value."""
@@ -60,6 +68,19 @@ def engine_state_summary() -> StateSummary:
     )
 
 
+@pytest.fixture()
+def run_time_parameters() -> List[RunTimeParameter]:
+    """Get a RunTimeParameter list."""
+    return [
+        BooleanParameter(
+            displayName="Display Name",
+            variableName="variable_name",
+            value=False,
+            default=True,
+        )
+    ]
+
+
 @pytest.fixture
 def protocol_commands() -> List[pe_commands.Command]:
     """Get a StateSummary value object."""
@@ -76,6 +97,7 @@ def subject(
     mock_engine_store: EngineStore,
     mock_run_store: RunStore,
     mock_task_runner: TaskRunner,
+    mock_runs_publisher: RunsPublisher,
 ) -> RunController:
     """Get a RunController test subject."""
     return RunController(
@@ -83,6 +105,7 @@ def subject(
         engine_store=mock_engine_store,
         run_store=mock_run_store,
         task_runner=mock_task_runner,
+        runs_publisher=mock_runs_publisher,
     )
 
 
@@ -121,7 +144,9 @@ async def test_create_play_action_to_start(
     mock_engine_store: EngineStore,
     mock_run_store: RunStore,
     mock_task_runner: TaskRunner,
+    mock_runs_publisher: RunsPublisher,
     engine_state_summary: StateSummary,
+    run_time_parameters: List[RunTimeParameter],
     protocol_commands: List[pe_commands.Command],
     run_id: str,
     subject: RunController,
@@ -153,6 +178,7 @@ async def test_create_play_action_to_start(
         RunResult(
             commands=protocol_commands,
             state_summary=engine_state_summary,
+            parameters=run_time_parameters,
         )
     )
 
@@ -163,12 +189,14 @@ async def test_create_play_action_to_start(
             run_id=run_id,
             summary=engine_state_summary,
             commands=protocol_commands,
+            run_time_parameters=run_time_parameters,
         ),
+        await mock_runs_publisher.publish_pre_serialized_commands_notification(run_id),
         times=1,
     )
 
 
-async def test_create_pause_action(
+def test_create_pause_action(
     decoy: Decoy,
     mock_engine_store: EngineStore,
     mock_run_store: RunStore,
@@ -193,7 +221,7 @@ async def test_create_pause_action(
     decoy.verify(mock_engine_store.runner.pause(), times=1)
 
 
-async def test_create_stop_action(
+def test_create_stop_action(
     decoy: Decoy,
     mock_engine_store: EngineStore,
     mock_run_store: RunStore,
@@ -217,6 +245,32 @@ async def test_create_stop_action(
 
     decoy.verify(mock_run_store.insert_action(run_id, result), times=1)
     decoy.verify(mock_task_runner.run(mock_engine_store.runner.stop), times=1)
+
+
+def test_create_resume_from_recovery_action(
+    decoy: Decoy,
+    mock_engine_store: EngineStore,
+    mock_run_store: RunStore,
+    mock_task_runner: TaskRunner,
+    run_id: str,
+    subject: RunController,
+) -> None:
+    """It should call `resume_from_recovery()` on the underlying engine store."""
+    result = subject.create_action(
+        action_id="some-action-id",
+        action_type=RunActionType.RESUME_FROM_RECOVERY,
+        created_at=datetime(year=2021, month=1, day=1),
+        action_payload=[],
+    )
+
+    assert result == RunAction(
+        id="some-action-id",
+        actionType=RunActionType.RESUME_FROM_RECOVERY,
+        createdAt=datetime(year=2021, month=1, day=1),
+    )
+
+    decoy.verify(mock_run_store.insert_action(run_id, result), times=1)
+    decoy.verify(mock_engine_store.runner.resume_from_recovery())
 
 
 @pytest.mark.parametrize(

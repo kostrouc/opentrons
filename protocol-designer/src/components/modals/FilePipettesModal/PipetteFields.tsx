@@ -1,65 +1,44 @@
 import * as React from 'react'
 import { useDispatch, useSelector } from 'react-redux'
+import { useTranslation } from 'react-i18next'
 import isEmpty from 'lodash/isEmpty'
-import {
-  DropdownField,
-  FormGroup,
-  PipetteSelect,
-  OutlineButton,
-  Mount,
-} from '@opentrons/components'
+import { FormGroup, PipetteSelect, OutlineButton } from '@opentrons/components'
 import {
   getIncompatiblePipetteNames,
   OT2_PIPETTES,
   OT2_ROBOT_TYPE,
   OT3_PIPETTES,
   RIGHT,
-  RobotType,
 } from '@opentrons/shared-data'
-import { i18n } from '../../../localization'
 import { createCustomTiprackDef } from '../../../labware-defs/actions'
 import { getLabwareDefsByURI } from '../../../labware-defs/selectors'
-import { FormPipettesByMount } from '../../../step-forms'
 import { getAllowAllTipracks } from '../../../feature-flags/selectors'
 import { getTiprackOptions } from '../utils'
 import { PipetteDiagram } from './PipetteDiagram'
+import { TiprackSelect } from './TiprackSelect'
 
-import styles from './FilePipettesModal.css'
-import formStyles from '../../forms/forms.css'
+import styles from './FilePipettesModal.module.css'
+import formStyles from '../../forms/forms.module.css'
 
-import type { PipetteName } from '@opentrons/shared-data'
-import { ThunkDispatch } from 'redux-thunk'
-import { BaseState } from '../../../types'
-export interface Props {
-  initialTabIndex?: number
+import type {
+  Control,
+  FormState,
+  UseFormSetValue,
+  UseFormTrigger,
+} from 'react-hook-form'
+import type { ThunkDispatch } from 'redux-thunk'
+import type { Mount } from '@opentrons/components'
+import type { RobotType, PipetteName } from '@opentrons/shared-data'
+import type { FormPipettesByMount } from '../../../step-forms'
+import type { BaseState } from '../../../types'
+import type { FormState as TypeFormState } from './index'
+
+export interface PipetteFieldsProps {
   values: FormPipettesByMount
-  // TODO 2020-3-20 use formik typing here after we update the def in flow-typed
-  errors:
-    | null
-    | string
-    | {
-        left?: {
-          tiprackDefURI: string
-        }
-        right?: {
-          tiprackDefURI: string
-        }
-      }
-  touched:
-    | null
-    | boolean
-    | {
-        left?: {
-          tiprackDefURI: boolean
-        }
-        right?: {
-          tiprackDefURI: boolean
-        }
-      }
-  onFieldChange: (event: React.ChangeEvent<HTMLSelectElement>) => unknown
-  onSetFieldValue: (field: string, value: string | null) => void
-  onSetFieldTouched: (field: string, touched: boolean) => void
-  onBlur: (event: React.FocusEvent<HTMLSelectElement>) => unknown
+  setValue: UseFormSetValue<TypeFormState>
+  trigger: UseFormTrigger<TypeFormState>
+  control: Control<TypeFormState, any>
+  formState: FormState<TypeFormState>
   robotType: RobotType
 }
 
@@ -75,29 +54,20 @@ interface TiprackSelectProps {
   robotType: RobotType
 }
 
-export function PipetteFields(props: Props): JSX.Element {
-  const {
-    values,
-    onFieldChange,
-    onSetFieldValue,
-    onSetFieldTouched,
-    onBlur,
-    errors,
-    touched,
-    robotType,
-  } = props
-
+export function PipetteFields(props: PipetteFieldsProps): JSX.Element {
+  const { values, setValue, trigger, robotType } = props
+  const { t } = useTranslation(['modal', 'button'])
   const allowAllTipracks = useSelector(getAllowAllTipracks)
   const dispatch = useDispatch<ThunkDispatch<BaseState, any, any>>()
   const allLabware = useSelector(getLabwareDefsByURI)
-  const initialTabIndex = props.initialTabIndex || 1
+  const initialTabIndex = 1
   const has96Channel = values.left.pipetteName === 'p1000_96'
 
   React.useEffect(() => {
     if (has96Channel) {
       values.right = { pipetteName: null, tiprackDefURI: null }
     }
-  }, [values.left])
+  }, [has96Channel, values.left])
 
   const renderPipetteSelect = (props: PipetteSelectProps): JSX.Element => {
     const { tabIndex, mount } = props
@@ -116,13 +86,10 @@ export function PipetteFields(props: Props): JSX.Element {
         tabIndex={tabIndex}
         pipetteName={pipetteName != null ? pipetteName : null}
         onPipetteChange={pipetteName => {
-          const nameAccessor = `pipettesByMount.${mount}.pipetteName`
-          const nameAccessorValue = pipetteName
-          const targetToClear = `pipettesByMount.${mount}.tiprackDefURI`
           // this select does not return an event so we have to manually set the field val
-          onSetFieldValue(nameAccessor, nameAccessorValue)
-          onSetFieldValue(targetToClear, null)
-          onSetFieldTouched(targetToClear, false)
+          setValue(`pipettesByMount.${mount}.pipetteName`, pipetteName)
+          setValue(`pipettesByMount.${mount}.tiprackDefURI`, null)
+          trigger(`pipettesByMount.${mount}.tiprackDefURI`)
         }}
         disabled={mount === RIGHT && has96Channel}
         id={`PipetteSelect_${mount}`}
@@ -141,27 +108,15 @@ export function PipetteFields(props: Props): JSX.Element {
     })
 
     return (
-      <DropdownField
-        error={
-          touched &&
-          typeof touched !== 'boolean' &&
-          touched[mount]?.tiprackDefURI &&
-          errors !== null &&
-          typeof errors !== 'string' &&
-          errors[mount] != null
-            ? errors[mount]?.tiprackDefURI
-            : null
-        }
-        tabIndex={initialTabIndex + 2}
-        disabled={
-          isEmpty(values[mount].pipetteName) ||
-          (mount === RIGHT && has96Channel)
-        }
-        options={tiprackOptions}
-        value={values[mount].tiprackDefURI}
-        name={`pipettesByMount.${mount}.tiprackDefURI`}
-        onChange={onFieldChange}
-        onBlur={onBlur}
+      <TiprackSelect
+        mount={mount}
+        tiprackOptions={tiprackOptions}
+        values={values}
+        onSetFieldValue={(field: string, value: string[]): void => {
+          //  @ts-expect-error: TS can't figure out this type with react-hook-form
+          setValue(field, value)
+          trigger(`pipettesByMount.${mount}.tiprackDefURI`)
+        }}
       />
     )
   }
@@ -174,8 +129,8 @@ export function PipetteFields(props: Props): JSX.Element {
             key="leftPipetteModel"
             label={
               has96Channel
-                ? i18n.t('modal.pipette_fields.pipette')
-                : i18n.t('modal.pipette_fields.left_pipette')
+                ? t('pipette_fields.pipette')
+                : t('pipette_fields.left_pipette')
             }
             className={formStyles.stacked_row}
           >
@@ -192,8 +147,8 @@ export function PipetteFields(props: Props): JSX.Element {
             key={'leftTiprackModel'}
             label={
               has96Channel
-                ? i18n.t('modal.pipette_fields.tiprack')
-                : i18n.t('modal.pipette_fields.left_tiprack')
+                ? t('pipette_fields.tiprack')
+                : t('pipette_fields.left_tiprack')
             }
             className={formStyles.stacked_row}
           >
@@ -210,7 +165,7 @@ export function PipetteFields(props: Props): JSX.Element {
           <div style={{ width: '13.8rem' }}>
             <FormGroup
               key="rightPipetteModel"
-              label={i18n.t('modal.pipette_fields.right_pipette')}
+              label={t('pipette_fields.right_pipette')}
               className={formStyles.stacked_row}
             >
               {renderPipetteSelect({
@@ -224,7 +179,7 @@ export function PipetteFields(props: Props): JSX.Element {
             <FormGroup
               disabled={isEmpty(values.right.pipetteName)}
               key={'rightTiprackModel'}
-              label={i18n.t('modal.pipette_fields.right_tiprack')}
+              label={t('pipette_fields.right_tiprack')}
               className={formStyles.stacked_row}
             >
               {renderTiprackSelect({ mount: 'right', robotType })}
@@ -234,7 +189,7 @@ export function PipetteFields(props: Props): JSX.Element {
       </div>
       <div>
         <OutlineButton Component="label" className={styles.upload_button}>
-          {i18n.t('button.upload_custom_tip_rack')}
+          {t('button:upload_custom_tip_rack')}
           <input
             type="file"
             onChange={e => dispatch(createCustomTiprackDef(e))}

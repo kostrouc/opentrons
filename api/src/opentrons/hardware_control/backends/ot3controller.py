@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from functools import wraps
 import logging
 from copy import deepcopy
+from numpy import isclose
 from typing import (
     Any,
     Awaitable,
@@ -14,7 +15,6 @@ from typing import (
     List,
     Optional,
     Tuple,
-    TYPE_CHECKING,
     Sequence,
     AsyncIterator,
     cast,
@@ -23,8 +23,9 @@ from typing import (
     Iterator,
     KeysView,
     Union,
+    Mapping,
 )
-from opentrons.config.types import OT3Config, GantryLoad
+from opentrons.config.types import OT3Config, GantryLoad, OutputOptions
 from opentrons.config import gripper_config
 from .ot3utils import (
     axis_convert,
@@ -44,13 +45,16 @@ from .ot3utils import (
     motor_nodes,
     LIMIT_SWITCH_OVERTRAVEL_DISTANCE,
     map_pipette_type_to_sensor_id,
-    moving_axes_in_move_group,
+    moving_pipettes_in_move_group,
     gripper_jaw_state_from_fw,
+    get_system_constraints,
+    get_system_constraints_for_calibration,
+    get_system_constraints_for_plunger_acceleration,
 )
 from .tip_presence_manager import TipPresenceManager
 
 try:
-    import aionotify  # type: ignore[import]
+    import aionotify  # type: ignore[import-untyped]
 except (OSError, ModuleNotFoundError):
     aionotify = None
 
@@ -67,20 +71,22 @@ from opentrons_hardware.drivers.binary_usb import (
 from opentrons_hardware.drivers.eeprom import EEPROMDriver, EEPROMData
 from opentrons_hardware.hardware_control.move_group_runner import MoveGroupRunner
 from opentrons_hardware.hardware_control.motion_planning import (
-    Move,
-    Coordinates,
+    MoveManager,
+    MoveTarget,
+    ZeroLengthMoveError,
 )
 from opentrons_hardware.hardware_control.estop.detector import (
     EstopDetector,
 )
 
-from opentrons.hardware_control.estop_state import EstopStateMachine
+from opentrons.hardware_control.backends.estop_state import EstopStateMachine
 
 from opentrons_hardware.hardware_control.motor_enable_disable import (
     set_enable_motor,
     set_disable_motor,
     set_enable_tip_motor,
     set_disable_tip_motor,
+    get_motor_enabled,
 )
 from opentrons_hardware.hardware_control.motor_position_status import (
     get_motor_position,
@@ -127,9 +133,13 @@ from opentrons.hardware_control.types import (
     SubSystemState,
     SubSystem,
     TipStateType,
-    EstopState,
     GripperJawState,
     HardwareFeatureFlags,
+    EstopOverallStatus,
+    EstopAttachLocation,
+    EstopState,
+    HardwareEventHandler,
+    HardwareEventUnsubscriber,
 )
 from opentrons.hardware_control.errors import (
     InvalidPipetteName,
@@ -160,6 +170,12 @@ from opentrons_hardware.hardware_control.rear_panel_settings import (
 from opentrons_hardware.hardware_control.gripper_settings import (
     get_gripper_jaw_state,
 )
+from opentrons_hardware.hardware_control.hepa_uv_settings import (
+    set_hepa_fan_state as set_hepa_fan_state_fw,
+    get_hepa_fan_state as get_hepa_fan_state_fw,
+    set_hepa_uv_state as set_hepa_uv_state_fw,
+    get_hepa_uv_state as get_hepa_uv_state_fw,
+)
 
 from opentrons_hardware.drivers.gpio import OT3GPIO, RemoteOT3GPIO
 from opentrons_shared_data.pipette.dev_types import PipetteName
@@ -174,16 +190,25 @@ from opentrons_shared_data.errors.exceptions import (
     EStopNotPresentError,
     PipetteOverpressureError,
     FirmwareUpdateRequiredError,
+    FailedGripperPickupError,
+    LiquidNotFoundError,
+    CommunicationError,
+    PythonException,
+    UnsupportedHardwareCommand,
 )
 
 from .subsystem_manager import SubsystemManager
 
-if TYPE_CHECKING:
-    from ..dev_types import (
-        AttachedPipette,
-        AttachedGripper,
-        OT3AttachedInstruments,
-    )
+from ..dev_types import (
+    AttachedPipette,
+    AttachedGripper,
+    OT3AttachedInstruments,
+)
+from ..types import HepaFanState, HepaUVState, StatusBarState
+
+from .types import HWStopCondition
+from .flex_protocol import FlexBackend
+from .status_bar_state import StatusBarStateController
 
 log = logging.getLogger(__name__)
 
@@ -229,7 +254,7 @@ def requires_estop(func: Wrapped) -> Wrapped:
     return cast(Wrapped, wrapper)
 
 
-class OT3Controller:
+class OT3Controller(FlexBackend):
     """OT3 Hardware Controller Backend."""
 
     _initialized: bool
@@ -239,6 +264,7 @@ class OT3Controller:
     _encoder_position: Dict[NodeId, float]
     _motor_status: Dict[NodeId, MotorStatus]
     _subsystem_manager: SubsystemManager
+    _engaged_axes: OT3AxisMap[bool]
 
     @classmethod
     async def build(
@@ -314,9 +340,12 @@ class OT3Controller:
         self._gear_motor_position: Dict[NodeId, float] = {}
         self._encoder_position = self._get_home_position()
         self._motor_status = {}
+        self._engaged_axes = {}
         self._check_updates = check_updates
         self._initialized = False
         self._status_bar = status_bar.StatusBar(messenger=self._usb_messenger)
+        self._status_bar_controller = StatusBarStateController(self._status_bar)
+
         try:
             self._event_watcher = self._build_event_watcher()
         except AttributeError:
@@ -326,6 +355,46 @@ class OT3Controller:
             )
         self._current_settings: Optional[OT3AxisMap[CurrentConfig]] = None
         self._tip_presence_manager = TipPresenceManager(self._messenger)
+        self._move_manager = MoveManager(
+            constraints=get_system_constraints(
+                self._configuration.motion_settings, GantryLoad.LOW_THROUGHPUT
+            )
+        )
+
+    @asynccontextmanager
+    async def restore_system_constraints(self) -> AsyncIterator[None]:
+        old_system_constraints = deepcopy(self._move_manager.get_constraints())
+        try:
+            yield
+        finally:
+            self._move_manager.update_constraints(old_system_constraints)
+            log.debug(f"Restore previous system constraints: {old_system_constraints}")
+
+    def update_constraints_for_calibration_with_gantry_load(
+        self,
+        gantry_load: GantryLoad,
+    ) -> None:
+        self._move_manager.update_constraints(
+            get_system_constraints_for_calibration(
+                self._configuration.motion_settings, gantry_load
+            )
+        )
+        log.debug(
+            f"Set system constraints for calibration: {self._move_manager.get_constraints()}"
+        )
+
+    def update_constraints_for_gantry_load(self, gantry_load: GantryLoad) -> None:
+        self._move_manager.update_constraints(
+            get_system_constraints(self._configuration.motion_settings, gantry_load)
+        )
+
+    def update_constraints_for_plunger_acceleration(
+        self, mount: OT3Mount, acceleration: float, gantry_load: GantryLoad
+    ) -> None:
+        new_constraints = get_system_constraints_for_plunger_acceleration(
+            self._configuration.motion_settings, gantry_load, mount, acceleration
+        )
+        self._move_manager.update_constraints(new_constraints)
 
     async def get_serial_number(self) -> Optional[str]:
         if not self.initialized:
@@ -394,8 +463,8 @@ class OT3Controller:
         )
 
     @property
-    def gear_motor_position(self) -> Dict[NodeId, float]:
-        return self._gear_motor_position
+    def gear_motor_position(self) -> Optional[float]:
+        return self._gear_motor_position.get(NodeId.pipette_left, None)
 
     def _motor_nodes(self) -> Set[NodeId]:
         """Get a list of the motor controller nodes of all attached and ok devices."""
@@ -547,9 +616,10 @@ class OT3Controller:
     @requires_estop
     async def move(
         self,
-        origin: Coordinates[Axis, float],
-        moves: List[Move[Axis]],
-        stop_condition: MoveStopCondition = MoveStopCondition.none,
+        origin: Dict[Axis, float],
+        target: Dict[Axis, float],
+        speed: float,
+        stop_condition: HWStopCondition = HWStopCondition.none,
         nodes_in_moves_only: bool = True,
     ) -> None:
         """Move to a position.
@@ -568,6 +638,17 @@ class OT3Controller:
         Returns:
             None
         """
+        move_target = MoveTarget.build(position=target, max_speed=speed)
+        try:
+            _, movelist = self._move_manager.plan_motion(
+                origin=origin, target_list=[move_target]
+            )
+        except ZeroLengthMoveError as zme:
+            log.warning(f"Not moving because move was zero length {str(zme)}")
+            return
+        moves = movelist[0]
+        log.info(f"move: machine {target} from {origin} requires {moves}")
+
         ordered_nodes = self._motor_nodes()
         if nodes_in_moves_only:
             moving_axes = {
@@ -575,7 +656,9 @@ class OT3Controller:
             }
             ordered_nodes = ordered_nodes.intersection(moving_axes)
 
-        group = create_move_group(origin, moves, ordered_nodes, stop_condition)
+        group = create_move_group(
+            origin, moves, ordered_nodes, MoveStopCondition[stop_condition.name]
+        )
         move_group, _ = group
         runner = MoveGroupRunner(
             move_groups=[move_group],
@@ -583,12 +666,10 @@ class OT3Controller:
             if not self._feature_flags.stall_detection_enabled
             else False,
         )
-        mounts_moving = [
-            k
-            for k in moving_axes_in_move_group(move_group)
-            if k in [NodeId.pipette_left, NodeId.pipette_right]
-        ]
-        async with self._monitor_overpressure(mounts_moving):
+
+        pipettes_moving = moving_pipettes_in_move_group(move_group)
+
+        async with self._monitor_overpressure(pipettes_moving):
             positions = await runner.run(can_messenger=self._messenger)
         self._handle_motor_status_response(positions)
 
@@ -750,10 +831,15 @@ class OT3Controller:
             raise e
 
     async def tip_action(
-        self,
-        moves: List[Move[Axis]],
+        self, origin: Dict[Axis, float], targets: List[Tuple[Dict[Axis, float], float]]
     ) -> None:
-        move_group = create_tip_action_group(moves, [NodeId.pipette_left], "clamp")
+        move_targets = [
+            MoveTarget.build(target_pos, speed) for target_pos, speed in targets
+        ]
+        _, moves = self._move_manager.plan_motion(
+            origin=origin, target_list=move_targets
+        )
+        move_group = create_tip_action_group(moves[0], [NodeId.pipette_left], "clamp")
 
         runner = MoveGroupRunner(
             move_groups=[move_group],
@@ -780,11 +866,12 @@ class OT3Controller:
     async def gripper_grip_jaw(
         self,
         duty_cycle: float,
-        stop_condition: MoveStopCondition = MoveStopCondition.none,
+        expected_displacement: float,  # not used on real hardware
+        stop_condition: HWStopCondition = HWStopCondition.none,
         stay_engaged: bool = True,
     ) -> None:
         move_group = create_gripper_jaw_grip_group(
-            duty_cycle, stop_condition, stay_engaged
+            duty_cycle, MoveStopCondition[stop_condition.name], stay_engaged
         )
         runner = MoveGroupRunner(move_groups=[move_group])
         positions = await runner.run(can_messenger=self._messenger)
@@ -892,7 +979,7 @@ class OT3Controller:
             )
 
     async def get_attached_instruments(
-        self, expected: Dict[OT3Mount, PipetteName]
+        self, expected: Mapping[OT3Mount, PipetteName]
     ) -> Dict[OT3Mount, OT3AttachedInstruments]:
         """Get attached instruments.
 
@@ -971,8 +1058,8 @@ class OT3Controller:
     @asynccontextmanager
     async def motor_current(
         self,
-        run_currents: OT3AxisMap[float] = {},
-        hold_currents: OT3AxisMap[float] = {},
+        run_currents: Optional[OT3AxisMap[float]] = None,
+        hold_currents: Optional[OT3AxisMap[float]] = None,
     ) -> AsyncIterator[None]:
         """Update and restore current."""
         assert self._current_settings
@@ -1015,13 +1102,36 @@ class OT3Controller:
                 {Axis.Z_R: high_throughput_settings[Axis.Z_R].run_current}
             )
 
+    @asynccontextmanager
+    async def increase_z_l_hold_current(self) -> AsyncIterator[None]:
+        """
+        Temporarily increase the hold current when engaging the Z_L axis
+        while the 96-channel is attached
+        """
+        assert self._current_settings
+        high_throughput_settings = deepcopy(self._current_settings)
+        await self.set_hold_current(
+            {Axis.Z_L: high_throughput_settings[Axis.Z_L].run_current}
+        )
+        try:
+            yield
+        finally:
+            await self.set_hold_current(
+                {Axis.Z_L: high_throughput_settings[Axis.Z_L].hold_current}
+            )
+
     @staticmethod
     def _build_event_watcher() -> aionotify.Watcher:
         watcher = aionotify.Watcher()
         watcher.watch(
             alias="modules",
             path="/dev",
-            flags=(aionotify.Flags.CREATE | aionotify.Flags.DELETE),
+            flags=(
+                aionotify.Flags.CREATE
+                | aionotify.Flags.DELETE
+                | aionotify.Flags.MOVED_FROM
+                | aionotify.Flags.MOVED_TO
+            ),
         )
         return watcher
 
@@ -1032,9 +1142,10 @@ class OT3Controller:
             log.debug("incomplete read error when quitting watcher")
             return
         if event is not None:
+            flags = aionotify.Flags.parse(event.flags)
+            log.debug(f"aionotify: {flags} {event.name}")
             if "ot_module" in event.name:
                 event_name = event.name
-                flags = aionotify.Flags.parse(event.flags)
                 event_description = AionotifyEvent.build(event_name, flags)
                 await self.module_controls.handle_module_appearance(event_description)
 
@@ -1050,37 +1161,65 @@ class OT3Controller:
     def axis_bounds(self) -> OT3AxisMap[Tuple[float, float]]:
         """Get the axis bounds."""
         # TODO (AL, 2021-11-18): The bounds need to be defined
-        phony_bounds = (0, 10000)
         return {
-            Axis.Z_L: phony_bounds,
-            Axis.Z_R: phony_bounds,
-            Axis.P_L: phony_bounds,
-            Axis.P_R: phony_bounds,
-            Axis.X: phony_bounds,
-            Axis.Y: phony_bounds,
-            Axis.Z_G: phony_bounds,
-            Axis.Q: phony_bounds,
+            Axis.Z_L: (0, 300),
+            Axis.Z_R: (0, 300),
+            Axis.P_L: (0, 200),
+            Axis.P_R: (0, 200),
+            Axis.X: (0, 550),
+            Axis.Y: (0, 550),
+            Axis.Z_G: (0, 300),
+            Axis.Q: (0, 200),
         }
 
     def engaged_axes(self) -> OT3AxisMap[bool]:
         """Get engaged axes."""
-        return {}
+        return self._engaged_axes
+
+    async def update_engaged_axes(self) -> None:
+        """Update engaged axes."""
+        motor_nodes = self._motor_nodes()
+        results = await get_motor_enabled(self._messenger, motor_nodes)
+        for node, status in results.items():
+            self._engaged_axes[node_to_axis(node)] = status
+
+    async def is_motor_engaged(self, axis: Axis) -> bool:
+        node = axis_to_node(axis)
+        result = await get_motor_enabled(self._messenger, {node})
+        try:
+            engaged = result[node]
+        except KeyError as ke:
+            raise CommunicationError(
+                message=f"No response from {node.name} for motor engagement query",
+                detail={"node": node.name},
+                wrapping=[PythonException(ke)],
+            ) from ke
+        self._engaged_axes.update({axis: engaged})
+        return engaged
 
     async def disengage_axes(self, axes: List[Axis]) -> None:
         """Disengage axes."""
         if Axis.Q in axes:
             await set_disable_tip_motor(self._messenger, {axis_to_node(Axis.Q)})
-        nodes = {axis_to_node(ax) for ax in axes if ax is not Axis.Q}
-        if len(nodes) > 0:
-            await set_disable_motor(self._messenger, nodes)
+            self._engaged_axes[Axis.Q] = False
+            axes = [ax for ax in axes if ax is not Axis.Q]
+
+        if len(axes) > 0:
+            await set_disable_motor(self._messenger, {axis_to_node(ax) for ax in axes})
+        for ax in axes:
+            self._engaged_axes[ax] = False
 
     async def engage_axes(self, axes: List[Axis]) -> None:
         """Engage axes."""
         if Axis.Q in axes:
             await set_enable_tip_motor(self._messenger, {axis_to_node(Axis.Q)})
-        nodes = {axis_to_node(ax) for ax in axes if ax is not Axis.Q}
-        if len(nodes) > 0:
-            await set_enable_motor(self._messenger, nodes)
+            self._engaged_axes[Axis.Q] = True
+            axes = [ax for ax in axes if ax is not Axis.Q]
+
+        if len(axes) > 0:
+            await set_enable_motor(self._messenger, {axis_to_node(ax) for ax in axes})
+        for ax in axes:
+            self._engaged_axes[ax] = True
 
     @requires_update
     async def set_lights(self, button: Optional[bool], rails: Optional[bool]) -> None:
@@ -1118,7 +1257,6 @@ class OT3Controller:
 
     async def clean_up(self) -> None:
         """Clean up."""
-
         try:
             loop = asyncio.get_event_loop()
         except RuntimeError:
@@ -1127,6 +1265,15 @@ class OT3Controller:
         if hasattr(self, "_event_watcher"):
             if loop.is_running() and self._event_watcher:
                 self._event_watcher.close()
+
+        messenger = getattr(self, "_messenger", None)
+        if messenger:
+            await messenger.stop()
+
+        usb_messenger = getattr(self, "_usb_messenger", None)
+        if usb_messenger:
+            await usb_messenger.stop()
+
         return None
 
     @staticmethod
@@ -1211,30 +1358,72 @@ class OT3Controller:
         mount_speed: float,
         plunger_speed: float,
         threshold_pascals: float,
-        log_pressure: bool = True,
+        output_option: OutputOptions = OutputOptions.can_bus_only,
+        data_files: Optional[Dict[InstrumentProbeType, str]] = None,
         auto_zero_sensor: bool = True,
         num_baseline_reads: int = 10,
         probe: InstrumentProbeType = InstrumentProbeType.PRIMARY,
-    ) -> Dict[NodeId, float]:
+    ) -> float:
+        if output_option == OutputOptions.sync_buffer_to_csv:
+            if (
+                self._subsystem_manager.device_info[
+                    SubSystem.of_mount(mount)
+                ].revision.tertiary
+                == "1"
+            ):
+                raise UnsupportedHardwareCommand(
+                    "Liquid Probe not supported on this pipette firmware"
+                )
+
         head_node = axis_to_node(Axis.by_mount(mount))
         tool = sensor_node_for_pipette(OT3Mount(mount.value))
+        csv_output = bool(output_option.value & OutputOptions.stream_to_csv.value)
+        sync_buffer_output = bool(
+            output_option.value & OutputOptions.sync_buffer_to_csv.value
+        )
+        can_bus_only_output = bool(
+            output_option.value & OutputOptions.can_bus_only.value
+        )
+        data_files_transposed = (
+            None
+            if data_files is None
+            else {
+                sensor_id_for_instrument(probe): data_files[probe]
+                for probe in data_files.keys()
+            }
+        )
         positions = await liquid_probe(
-            self._messenger,
-            tool,
-            head_node,
-            max_z_distance,
-            plunger_speed,
-            mount_speed,
-            threshold_pascals,
-            log_pressure,
-            auto_zero_sensor,
-            num_baseline_reads,
-            sensor_id_for_instrument(probe),
+            messenger=self._messenger,
+            tool=tool,
+            head_node=head_node,
+            max_z_distance=max_z_distance,
+            plunger_speed=plunger_speed,
+            mount_speed=mount_speed,
+            threshold_pascals=threshold_pascals,
+            csv_output=csv_output,
+            sync_buffer_output=sync_buffer_output,
+            can_bus_only_output=can_bus_only_output,
+            data_files=data_files_transposed,
+            auto_zero_sensor=auto_zero_sensor,
+            num_baseline_reads=num_baseline_reads,
+            sensor_id=sensor_id_for_instrument(probe),
         )
         for node, point in positions.items():
             self._position.update({node: point.motor_position})
             self._encoder_position.update({node: point.encoder_position})
-        return self._position
+        if (
+            head_node not in positions
+            or positions[head_node].move_ack
+            == MoveCompleteAck.complete_without_condition
+        ):
+            raise LiquidNotFoundError(
+                "Liquid not found during probe.",
+                {
+                    str(node_to_axis(node)): str(point.motor_position)
+                    for node, point in positions.items()
+                },
+            )
+        return self._position[axis_to_node(Axis.by_mount(mount))]
 
     async def capacitive_probe(
         self,
@@ -1334,9 +1523,6 @@ class OT3Controller:
                 ),
             )
 
-    def status_bar_interface(self) -> status_bar.StatusBar:
-        return self._status_bar
-
     async def build_estop_detector(self) -> bool:
         """Must be called to set up the estop detector & state machine."""
         if self._drivers.usb_messenger is None:
@@ -1346,11 +1532,6 @@ class OT3Controller:
         )
         self._estop_state_machine.subscribe_to_detector(self._estop_detector)
         return True
-
-    @property
-    def estop_state_machine(self) -> EstopStateMachine:
-        """Accessor for the API to get the state machine, if it exists."""
-        return self._estop_state_machine
 
     @property
     def tip_presence_manager(self) -> TipPresenceManager:
@@ -1364,8 +1545,148 @@ class OT3Controller:
     async def teardown_tip_detector(self, mount: OT3Mount) -> None:
         await self._tip_presence_manager.clear_detector(mount)
 
-    async def get_tip_status(self, mount: OT3Mount) -> TipStateType:
-        return await self.tip_presence_manager.get_tip_status(mount)
+    async def get_tip_status(
+        self,
+        mount: OT3Mount,
+        follow_singular_sensor: Optional[InstrumentProbeType] = None,
+    ) -> TipStateType:
+        return await self.tip_presence_manager.get_tip_status(
+            mount, follow_singular_sensor
+        )
 
     def current_tip_state(self, mount: OT3Mount) -> Optional[bool]:
         return self.tip_presence_manager.current_tip_state(mount)
+
+    async def set_status_bar_state(self, state: StatusBarState) -> None:
+        await self._status_bar_controller.set_status_bar_state(state)
+
+    async def set_status_bar_enabled(self, enabled: bool) -> None:
+        await self._status_bar_controller.set_enabled(enabled)
+
+    def get_status_bar_state(self) -> StatusBarState:
+        return self._status_bar_controller.get_current_state()
+
+    @property
+    def estop_status(self) -> EstopOverallStatus:
+        return EstopOverallStatus(
+            state=self._estop_state_machine.state,
+            left_physical_state=self._estop_state_machine.get_physical_status(
+                EstopAttachLocation.LEFT
+            ),
+            right_physical_state=self._estop_state_machine.get_physical_status(
+                EstopAttachLocation.RIGHT
+            ),
+        )
+
+    def estop_acknowledge_and_clear(self) -> EstopOverallStatus:
+        """Attempt to acknowledge an Estop event and clear the status.
+
+        Returns the estop status after clearing the status."""
+        self._estop_state_machine.acknowledge_and_clear()
+        return self.estop_status
+
+    def get_estop_state(self) -> EstopState:
+        return self._estop_state_machine.state
+
+    def add_estop_callback(self, cb: HardwareEventHandler) -> HardwareEventUnsubscriber:
+        return self._estop_state_machine.add_listener(cb)
+
+    def check_gripper_position_within_bounds(
+        self,
+        expected_grip_width: float,
+        grip_width_uncertainty_wider: float,
+        grip_width_uncertainty_narrower: float,
+        jaw_width: float,
+        max_allowed_grip_error: float,
+        hard_limit_lower: float,
+        hard_limit_upper: float,
+    ) -> None:
+        """
+        Check if the gripper is at the expected location.
+
+        While this doesn't seem like it belongs here, it needs to act differently
+        when we're simulating, so it does.
+        """
+        expected_gripper_position_min = (
+            expected_grip_width - grip_width_uncertainty_narrower
+        )
+        expected_gripper_position_max = (
+            expected_grip_width + grip_width_uncertainty_wider
+        )
+        current_gripper_position = jaw_width
+        if isclose(current_gripper_position, hard_limit_lower):
+            raise FailedGripperPickupError(
+                message="Failed to grip: jaws all the way closed",
+                details={
+                    "failure-type": "jaws-all-the-way-closed",
+                    "actual-jaw-width": current_gripper_position,
+                },
+            )
+        if isclose(current_gripper_position, hard_limit_upper):
+            raise FailedGripperPickupError(
+                message="Failed to grip: jaws all the way open",
+                details={
+                    "failure-type": "jaws-all-the-way-open",
+                    "actual-jaw-width": current_gripper_position,
+                },
+            )
+        if (
+            current_gripper_position - expected_gripper_position_min
+            < -max_allowed_grip_error
+        ):
+            raise FailedGripperPickupError(
+                message="Failed to grip: jaws closed too far",
+                details={
+                    "failure-type": "jaws-more-closed-than-expected",
+                    "lower-bound-labware-width": expected_grip_width
+                    - grip_width_uncertainty_narrower,
+                    "actual-jaw-width": current_gripper_position,
+                },
+            )
+        if (
+            current_gripper_position - expected_gripper_position_max
+            > max_allowed_grip_error
+        ):
+            raise FailedGripperPickupError(
+                message="Failed to grip: jaws could not close far enough",
+                details={
+                    "failure-type": "jaws-more-open-than-expected",
+                    "upper-bound-labware-width": expected_grip_width
+                    - grip_width_uncertainty_narrower,
+                    "actual-jaw-width": current_gripper_position,
+                },
+            )
+
+    async def set_hepa_fan_state(self, fan_on: bool, duty_cycle: int) -> bool:
+        return await set_hepa_fan_state_fw(self._messenger, fan_on, duty_cycle)
+
+    async def get_hepa_fan_state(self) -> Optional[HepaFanState]:
+        res = await get_hepa_fan_state_fw(self._messenger)
+        return (
+            HepaFanState(
+                fan_on=res.fan_on,
+                duty_cycle=res.duty_cycle,
+            )
+            if res
+            else None
+        )
+
+    async def set_hepa_uv_state(self, light_on: bool, uv_duration_s: int) -> bool:
+        return await set_hepa_uv_state_fw(self._messenger, light_on, uv_duration_s)
+
+    async def get_hepa_uv_state(self) -> Optional[HepaUVState]:
+        res = await get_hepa_uv_state_fw(self._messenger)
+        return (
+            HepaUVState(
+                light_on=res.uv_light_on,
+                uv_duration_s=res.uv_duration_s,
+                remaining_time_s=res.remaining_time_s,
+            )
+            if res
+            else None
+        )
+
+    def _update_tip_state(self, mount: OT3Mount, status: bool) -> None:
+        """This is something we only use in the simulator.
+        It is required so that PE simulations using ot3api don't break."""
+        pass

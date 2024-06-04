@@ -1,6 +1,8 @@
 import * as React from 'react'
 import { fireEvent, screen } from '@testing-library/react'
-import { renderWithProviders } from '@opentrons/components'
+import { describe, it, expect, vi } from 'vitest'
+
+import { renderWithProviders } from '../../../__testing-utils__'
 import { i18n } from '../../../i18n'
 import { UnskippableModal } from '../UnskippableModal'
 
@@ -14,8 +16,8 @@ describe('UnskippableModal', () => {
   let props: React.ComponentProps<typeof UnskippableModal>
   it('returns the correct information for unskippable modal, pressing return button calls goBack prop', () => {
     props = {
-      goBack: jest.fn(),
-      proceed: jest.fn(),
+      goBack: vi.fn(),
+      proceed: vi.fn(),
       isOnDevice: false,
       isRobotMoving: false,
     }
@@ -29,8 +31,8 @@ describe('UnskippableModal', () => {
   })
   it('renders the is on device button with correct text when it is on device display', () => {
     props = {
-      goBack: jest.fn(),
-      proceed: jest.fn(),
+      goBack: vi.fn(),
+      proceed: vi.fn(),
       isOnDevice: true,
       isRobotMoving: false,
     }
@@ -39,7 +41,9 @@ describe('UnskippableModal', () => {
     screen.getByText(
       'You must detach the mounting plate and reattach the z-axis carraige before using other pipettes. We do not recommend exiting this process before completion.'
     )
-    fireEvent.click(screen.getByRole('button', { name: 'exit' }))
+    screen.getByText('Exit')
+    screen.getByText('Go back')
+    fireEvent.click(screen.getByRole('button', { name: 'Exit' }))
     expect(props.proceed).toHaveBeenCalled()
   })
 })

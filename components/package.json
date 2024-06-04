@@ -4,8 +4,8 @@
   "description": "React components library for Opentrons' projects",
   "source": "src/index.ts",
   "types": "lib/index.d.ts",
-  "style": "src/index.css",
-  "main": "lib/opentrons-components.js",
+  "style": "src/index.module.css",
+  "main": "lib/index.mjs",
   "module": "src/index.ts",
   "repository": {
     "type": "git",
@@ -19,6 +19,7 @@
   "homepage": "https://github.com/Opentrons/opentrons#readme",
   "peerDependencies": {
     "react": "18.2.0",
+    "react-dom": "18.2.0",
     "react-router-dom": "5.3.4",
     "@types/react-router-dom": "5.3.3"
   },
@@ -34,12 +35,15 @@
     "classnames": "2.2.5",
     "interactjs": "^1.10.17",
     "lodash": "4.17.21",
+    "react-i18next": "13.5.0",
     "react-popper": "1.0.0",
     "react-remove-scroll": "2.4.3",
+    "react-router-dom": "5.3.4",
     "react-select": "5.4.0",
+    "redux": "4.0.5",
     "styled-components": "5.3.6"
   },
-  "browser": {
-    "jest-when": false
+  "devDependencies": {
+    "react-redux": "8.1.2"
   }
 }

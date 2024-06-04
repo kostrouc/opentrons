@@ -1,20 +1,18 @@
-import type { Mount } from '@opentrons/components'
-import {
+import type {
   MAGNETIC_MODULE_TYPE,
   TEMPERATURE_MODULE_TYPE,
   THERMOCYCLER_MODULE_TYPE,
   HEATERSHAKER_MODULE_TYPE,
   MAGNETIC_BLOCK_TYPE,
-  LabwareLocation,
-} from '@opentrons/shared-data'
-import type {
   CreateCommand,
   LabwareDefinition2,
   ModuleType,
   ModuleModel,
-  PipetteNameSpecs,
   PipetteName,
   NozzleConfigurationStyle,
+  LabwareLocation,
+  PipetteMount as Mount,
+  PipetteV2Specs,
 } from '@opentrons/shared-data'
 import type {
   AtomicProfileStep,
@@ -27,7 +25,7 @@ import type {
   TEMPERATURE_AT_TARGET,
   TEMPERATURE_APPROACHING_TARGET,
 } from './constants'
-import { ShakeSpeedParams } from '@opentrons/shared-data/protocol/types/schemaV6/command/module'
+import type { ShakeSpeedParams } from '@opentrons/shared-data/protocol/types/schemaV6/command/module'
 
 export type { Command }
 
@@ -108,7 +106,7 @@ export interface NormalizedPipetteById {
   [pipetteId: string]: {
     name: PipetteName
     id: string
-    tiprackDefURI: string
+    tiprackDefURI: string[]
   }
 }
 
@@ -131,8 +129,8 @@ export type NormalizedPipette = NormalizedPipetteById[keyof NormalizedPipetteByI
 // when they are de-normalized, the definitions they reference are baked in
 // =========== PIPETTES ========
 export type PipetteEntity = NormalizedPipette & {
-  tiprackLabwareDef: LabwareDefinition2
-  spec: PipetteNameSpecs
+  tiprackLabwareDef: LabwareDefinition2[]
+  spec: PipetteV2Specs
 }
 
 export interface PipetteEntities {
@@ -166,6 +164,7 @@ interface CommonArgs {
 // ===== Processed form types. Used as args to call command creator fns =====
 
 export type SharedTransferLikeArgs = CommonArgs & {
+  tipRack: string // tipRackDefUri
   pipette: string // PipetteId
   nozzles: NozzleConfigurationStyle | null // setting for 96-channel
   sourceLabware: string
@@ -191,6 +190,10 @@ export type SharedTransferLikeArgs = CommonArgs & {
   aspirateFlowRateUlSec: number
   /** offset from bottom of well in mm */
   aspirateOffsetFromBottomMm: number
+  /** x offset mm */
+  aspirateXOffset: number
+  /** y offset mm */
+  aspirateYOffset: number
 
   // ===== DISPENSE SETTINGS =====
   /** Air gap after dispense */
@@ -205,6 +208,10 @@ export type SharedTransferLikeArgs = CommonArgs & {
   dispenseFlowRateUlSec: number
   /** offset from bottom of well in mm */
   dispenseOffsetFromBottomMm: number
+  /** x offset mm */
+  dispenseXOffset: number
+  /** y offset mm */
+  dispenseYOffset: number
 }
 
 export type ConsolidateArgs = SharedTransferLikeArgs & {
@@ -261,6 +268,7 @@ export type DistributeArgs = SharedTransferLikeArgs & {
 
 export type MixArgs = CommonArgs & {
   commandCreatorFnName: 'mix'
+  tipRack: string // tipRackDefUri
   labware: string
   pipette: string
   nozzles: NozzleConfigurationStyle | null // setting for 96-channel
@@ -284,6 +292,12 @@ export type MixArgs = CommonArgs & {
   /** offset from bottom of well in mm */
   aspirateOffsetFromBottomMm: number
   dispenseOffsetFromBottomMm: number
+  /** x offset */
+  aspirateXOffset: number
+  dispenseXOffset: number
+  /** y offset */
+  aspirateYOffset: number
+  dispenseYOffset: number
   /** flow rates in uL/sec */
   aspirateFlowRateUlSec: number
   dispenseFlowRateUlSec: number
@@ -510,20 +524,24 @@ export type ErrorType =
   | 'HEATER_SHAKER_NORTH_SOUTH_EAST_WEST_SHAKING'
   | 'INSUFFICIENT_TIPS'
   | 'INVALID_SLOT'
+  | 'LABWARE_DISCARDED_IN_WASTE_CHUTE'
   | 'LABWARE_DOES_NOT_EXIST'
   | 'LABWARE_OFF_DECK'
+  | 'LABWARE_ON_ANOTHER_ENTITY'
   | 'MISMATCHED_SOURCE_DEST_WELLS'
   | 'MISSING_96_CHANNEL_TIPRACK_ADAPTER'
   | 'MISSING_MODULE'
   | 'MISSING_TEMPERATURE_STEP'
   | 'MODULE_PIPETTE_COLLISION_DANGER'
   | 'NO_TIP_ON_PIPETTE'
+  | 'NO_TIP_SELECTED'
   | 'PIPETTE_DOES_NOT_EXIST'
+  | 'PIPETTE_HAS_TIP'
   | 'PIPETTE_VOLUME_EXCEEDED'
   | 'PIPETTING_INTO_COLUMN_4'
+  | 'POSSIBLE_PIPETTE_COLLISION'
   | 'REMOVE_96_CHANNEL_TIPRACK_ADAPTER'
   | 'TALL_LABWARE_EAST_WEST_OF_HEATER_SHAKER'
-  | 'TALL_LABWARE_WEST_OF_96_CHANNEL_LABWARE'
   | 'THERMOCYCLER_LID_CLOSED'
   | 'TIP_VOLUME_EXCEEDED'
 

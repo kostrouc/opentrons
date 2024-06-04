@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Dict, Optional, Type, Union, List, Tuple, TYPE_CHECKING
 
 from opentrons.protocol_engine.commands import LoadModuleResult
-from opentrons_shared_data.deck.dev_types import DeckDefinitionV4, SlotDefV3
+from opentrons_shared_data.deck.dev_types import DeckDefinitionV5, SlotDefV3
 from opentrons_shared_data.labware.labware_definition import LabwareDefinition
 from opentrons_shared_data.labware.dev_types import LabwareDefinition as LabwareDefDict
 from opentrons_shared_data.pipette.dev_types import PipetteNameType
@@ -51,8 +51,7 @@ from opentrons.protocol_engine.errors import (
 from ... import validation
 from ..._types import OffDeckType
 from ..._liquid import Liquid
-from ..._trash_bin import TrashBin
-from ..._waste_chute import WasteChute
+from ...disposal_locations import TrashBin, WasteChute
 from ..protocol import AbstractProtocol
 from ..labware import LabwareLoadParams
 from .labware import LabwareCore
@@ -132,14 +131,36 @@ class ProtocolCore(
                 )
 
     def append_disposal_location(
-        self, disposal_location: Union[Labware, TrashBin, WasteChute]
+        self,
+        disposal_location: Union[Labware, TrashBin, WasteChute],
     ) -> None:
-        """Append a disposal location object to the core"""
+        """Append a disposal location object to the core."""
         self._disposal_locations.append(disposal_location)
+
+    def _add_disposal_location_to_engine(
+        self, disposal_location: Union[TrashBin, WasteChute]
+    ) -> None:
+        """Verify and add disposal location to engine store and append it to the core."""
+        self._engine_client.state.addressable_areas.raise_if_area_not_in_deck_configuration(
+            disposal_location.area_name
+        )
+        if isinstance(disposal_location, TrashBin):
+            deck_conflict.check(
+                engine_state=self._engine_client.state,
+                new_trash_bin=disposal_location,
+                existing_disposal_locations=self._disposal_locations,
+                # TODO: We can now fetch these IDs from engine too.
+                #  See comment in self.load_labware().
+                #
+                # Wrapping .keys() in list() is just to make Decoy verification easier.
+                existing_labware_ids=list(self._labware_cores_by_id.keys()),
+                existing_module_ids=list(self._module_cores_by_id.keys()),
+            )
+        self._engine_client.add_addressable_area(disposal_location.area_name)
+        self.append_disposal_location(disposal_location)
 
     def get_disposal_locations(self) -> List[Union[Labware, TrashBin, WasteChute]]:
         """Get disposal locations."""
-
         return self._disposal_locations
 
     def get_max_speeds(self) -> AxisMaxSpeeds:
@@ -212,11 +233,12 @@ class ProtocolCore(
         deck_conflict.check(
             engine_state=self._engine_client.state,
             new_labware_id=load_result.labwareId,
-            # It's important that we don't fetch these IDs from Protocol Engine, and
-            # use our own bookkeeping instead. If we fetched these IDs from Protocol
-            # Engine, it would have leaked state from Labware Position Check in the
-            # same HTTP run.
-            #
+            existing_disposal_locations=self._disposal_locations,
+            # TODO (spp, 2023-11-27): We've been using IDs from _labware_cores_by_id
+            #  and _module_cores_by_id instead of getting the lists directly from engine
+            #  because of the chance of engine carrying labware IDs from LPC too.
+            #  But with https://github.com/Opentrons/opentrons/pull/13943,
+            #  & LPC in maintenance runs, we can now rely on engine state for these IDs too.
             # Wrapping .keys() in list() is just to make Decoy verification easier.
             existing_labware_ids=list(self._labware_cores_by_id.keys()),
             existing_module_ids=list(self._module_cores_by_id.keys()),
@@ -266,11 +288,10 @@ class ProtocolCore(
         deck_conflict.check(
             engine_state=self._engine_client.state,
             new_labware_id=load_result.labwareId,
-            # TODO (spp, 2023-11-27): We've been using IDs from _labware_cores_by_id
-            #  and _module_cores_by_id instead of getting the lists directly from engine
-            #  because of the chance of engine carrying labware IDs from LPC too.
-            #  But with https://github.com/Opentrons/opentrons/pull/13943,
-            #  & LPC in maintenance runs, we can now rely on engine state for these IDs too.
+            existing_disposal_locations=self._disposal_locations,
+            # TODO: We can now fetch these IDs from engine too.
+            #  See comment in self.load_labware().
+            #
             # Wrapping .keys() in list() is just to make Decoy verification easier.
             existing_labware_ids=list(self._labware_cores_by_id.keys()),
             existing_module_ids=list(self._module_cores_by_id.keys()),
@@ -326,9 +347,6 @@ class ProtocolCore(
 
         to_location = self._convert_labware_location(location=new_location)
 
-        # TODO(mm, 2023-02-23): Check for conflicts with other items on the deck,
-        # when move_labware() support is no longer experimental.
-
         self._engine_client.move_labware(
             labware_id=labware_core.labware_id,
             new_location=to_location,
@@ -341,6 +359,21 @@ class ProtocolCore(
             # Clear out last location since it is not relevant to pipetting
             # and we only use last location for in-place pipetting commands
             self.set_last_location(location=None, mount=Mount.EXTENSION)
+
+        # FIXME(jbl, 2024-01-04) deck conflict after execution logic issue, read notes in load_labware for more info:
+        deck_conflict.check(
+            engine_state=self._engine_client.state,
+            new_labware_id=labware_core.labware_id,
+            existing_disposal_locations=self._disposal_locations,
+            # TODO: We can now fetch these IDs from engine too.
+            #  See comment in self.load_labware().
+            existing_labware_ids=[
+                labware_id
+                for labware_id in self._labware_cores_by_id
+                if labware_id != labware_core.labware_id
+            ],
+            existing_module_ids=list(self._module_cores_by_id.keys()),
+        )
 
     def _resolve_module_hardware(
         self, serial_number: str, model: ModuleModel
@@ -376,7 +409,6 @@ class ProtocolCore(
 
         robot_type = self._engine_client.state.config.robot_type
         normalized_deck_slot = deck_slot.to_equivalent_for_robot_type(robot_type)
-        self._ensure_module_location(normalized_deck_slot, module_type)
 
         result = self._engine_client.load_module(
             model=EngineModuleModel(model),
@@ -391,6 +423,7 @@ class ProtocolCore(
         deck_conflict.check(
             engine_state=self._engine_client.state,
             new_module_id=result.moduleId,
+            existing_disposal_locations=self._disposal_locations,
             # TODO: We can now fetch these IDs from engine too.
             #  See comment in self.load_labware().
             #
@@ -476,6 +509,51 @@ class ProtocolCore(
             default_movement_speed=400,
         )
 
+    def load_trash_bin(self, slot_name: DeckSlotName, area_name: str) -> TrashBin:
+        """Load a deck configuration based trash bin.
+
+        Args:
+            slot_name: the slot the trash is being loaded into.
+            area_name: the addressable area name of the trash.
+
+        Returns:
+            A trash bin object.
+        """
+        trash_bin = TrashBin(
+            location=slot_name,
+            addressable_area_name=area_name,
+            api_version=self._api_version,
+            engine_client=self._engine_client,
+        )
+        self._add_disposal_location_to_engine(trash_bin)
+        return trash_bin
+
+    def load_ot2_fixed_trash_bin(self) -> None:
+        """Load a deck configured OT-2 fixed trash in Slot 12."""
+        _fixed_trash_trash_bin = TrashBin(
+            location=DeckSlotName.FIXED_TRASH,
+            addressable_area_name="fixedTrash",
+            api_version=self._api_version,
+            engine_client=self._engine_client,
+        )
+        # We are just appending the fixed trash to the core's internal list here, not adding it to the engine via
+        # the core, since that method works through the SyncClient and if called from here, will cause protocols
+        # to deadlock. Instead, that method is called in protocol engine directly in create_protocol_context after
+        # ProtocolContext is initialized.
+        self.append_disposal_location(_fixed_trash_trash_bin)
+
+    def load_waste_chute(self) -> WasteChute:
+        """Load a deck configured waste chute into Slot D3.
+
+        Returns:
+            A waste chute object.
+        """
+        waste_chute = WasteChute(
+            engine_client=self._engine_client, api_version=self._api_version
+        )
+        self._add_disposal_location_to_engine(waste_chute)
+        return waste_chute
+
     def pause(self, msg: Optional[str]) -> None:
         """Pause the protocol."""
         self._engine_client.wait_for_resume(message=msg)
@@ -523,7 +601,7 @@ class ProtocolCore(
         self._last_location = location
         self._last_mount = mount
 
-    def get_deck_definition(self) -> DeckDefinitionV4:
+    def get_deck_definition(self) -> DeckDefinitionV5:
         """Get the geometry definition of the robot's deck."""
         return self._engine_client.state.labware.get_deck_definition()
 
@@ -542,14 +620,6 @@ class ProtocolCore(
         return (
             self._engine_client.state.addressable_areas.get_staging_slot_definitions()
         )
-
-    def _ensure_module_location(
-        self, slot: DeckSlotName, module_type: ModuleType
-    ) -> None:
-        slot_def = self.get_slot_definition(slot)
-        compatible_modules = slot_def["compatibleModuleTypes"]
-        if module_type.value not in compatible_modules:
-            raise ValueError(f"A {module_type.value} cannot be loaded into slot {slot}")
 
     def get_slot_item(
         self, slot_name: Union[DeckSlotName, StagingSlotName]

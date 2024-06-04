@@ -6,6 +6,7 @@ from opentrons.protocol_engine.execution import MovementHandler
 from opentrons.protocol_engine.state import StateView
 from opentrons.types import Point
 
+from opentrons.protocol_engine.commands.command import SuccessData
 from opentrons.protocol_engine.commands.move_to_addressable_area_for_drop_tip import (
     MoveToAddressableAreaForDropTipParams,
     MoveToAddressableAreaForDropTipResult,
@@ -31,6 +32,7 @@ async def test_move_to_addressable_area_for_drop_tip_implementation(
         minimumZHeight=4.56,
         speed=7.89,
         alternateDropLocation=True,
+        ignoreTipConfiguration=False,
     )
 
     decoy.when(
@@ -47,11 +49,13 @@ async def test_move_to_addressable_area_for_drop_tip_implementation(
             force_direct=True,
             minimum_z_height=4.56,
             speed=7.89,
+            ignore_tip_configuration=False,
         )
     ).then_return(Point(x=9, y=8, z=7))
 
     result = await subject.execute(data)
 
-    assert result == MoveToAddressableAreaForDropTipResult(
-        position=DeckPoint(x=9, y=8, z=7)
+    assert result == SuccessData(
+        public=MoveToAddressableAreaForDropTipResult(position=DeckPoint(x=9, y=8, z=7)),
+        private=None,
     )

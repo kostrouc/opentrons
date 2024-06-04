@@ -1,3 +1,4 @@
+import type { AddressableAreaName } from '../../deck'
 import type { CommonCommandRunTimeInfo, CommonCommandCreateInfo } from '.'
 export type PipettingRunTimeCommand =
   | AspirateInPlaceRunTimeCommand
@@ -224,7 +225,7 @@ export interface DropTipInPlaceParams {
 
 export interface MoveToAddressableAreaForDropTipParams {
   pipetteId: string
-  addressableAreaName: string
+  addressableAreaName: AddressableAreaName
   offset?: AddressableOffsetVector
   alternateDropLocation?: boolean
   speed?: number
@@ -281,6 +282,7 @@ interface WellLocationParam {
 
 interface VerifyTipPresenceParams extends PipetteIdentityParams {
   expectedState?: 'present' | 'absent'
+  followSingularSensor?: 'primary' | 'secondary'
 }
 
 interface BasicLiquidHandlingResult {

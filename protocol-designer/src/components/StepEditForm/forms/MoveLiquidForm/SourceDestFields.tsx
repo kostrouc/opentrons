@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useSelector } from 'react-redux'
-import { i18n } from '../../../../localization'
+import { useTranslation } from 'react-i18next'
 import { getAdditionalEquipmentEntities } from '../../../../step-forms/selectors'
 
 import {
@@ -11,13 +11,14 @@ import {
   TextField,
   TipPositionField,
   WellOrderField,
+  BlowoutZOffsetField,
 } from '../../fields'
 import { MixFields } from '../../fields/MixFields'
 import {
   getBlowoutLocationOptionsForForm,
   getLabwareFieldForPositioningField,
 } from '../../utils'
-import styles from '../../StepEditForm.css'
+import styles from '../../StepEditForm.module.css'
 
 import type { FormData } from '../../../../form-types'
 import type { StepFieldName } from '../../../../steplist/fieldLevel'
@@ -36,6 +37,8 @@ const makeAddFieldNamePrefix = (prefix: string) => (
 
 export const SourceDestFields = (props: SourceDestFieldsProps): JSX.Element => {
   const { className, formData, prefix, propsForFields } = props
+  const { t } = useTranslation(['form', 'application'])
+
   const additionalEquipmentEntities = useSelector(
     getAdditionalEquipmentEntities
   )
@@ -89,9 +92,14 @@ export const SourceDestFields = (props: SourceDestFieldsProps): JSX.Element => {
           {...propsForFields[addFieldNamePrefix('flowRate')]}
           pipetteId={formData.pipette}
           flowRateType={prefix}
+          volume={propsForFields.volume?.value ?? 0}
+          tiprack={propsForFields.tipRack.value}
         />
         <TipPositionField
-          {...propsForFields[addFieldNamePrefix('mmFromBottom')]}
+          propsForFields={propsForFields}
+          zField={`${prefix}_mmFromBottom`}
+          xField={`${prefix}_x_position`}
+          yField={`${prefix}_y_position`}
           labwareId={
             formData[
               getLabwareFieldForPositioningField(
@@ -103,7 +111,7 @@ export const SourceDestFields = (props: SourceDestFieldsProps): JSX.Element => {
         {hideWellOrderField ? null : (
           <WellOrderField
             prefix={prefix}
-            label={i18n.t('form.step_edit_form.field.well_order.label')}
+            label={t('step_edit_form.field.well_order.label')}
             updateFirstWellOrder={
               propsForFields[addFieldNamePrefix('wellOrder_first')].updateValue
             }
@@ -123,7 +131,7 @@ export const SourceDestFields = (props: SourceDestFieldsProps): JSX.Element => {
           <>
             <CheckboxRowField
               {...propsForFields.preWetTip}
-              label={i18n.t('form.step_edit_form.field.preWetTip.label')}
+              label={t('step_edit_form.field.preWetTip.label')}
               className={styles.small_field}
             />
             {getMixFields()}
@@ -137,27 +145,10 @@ export const SourceDestFields = (props: SourceDestFieldsProps): JSX.Element => {
           </>
         )}
 
-        <CheckboxRowField
-          {...propsForFields[addFieldNamePrefix('touchTip_checkbox')]}
-          label={i18n.t('form.step_edit_form.field.touchTip.label')}
-          className={styles.small_field}
-        >
-          <TipPositionField
-            {...propsForFields[addFieldNamePrefix('touchTip_mmFromBottom')]}
-            labwareId={
-              formData[
-                getLabwareFieldForPositioningField(
-                  addFieldNamePrefix('touchTip_mmFromBottom')
-                )
-              ]
-            }
-          />
-        </CheckboxRowField>
-
         {prefix === 'dispense' && (
           <CheckboxRowField
             {...propsForFields.blowout_checkbox}
-            label={i18n.t('form.step_edit_form.field.blowout.label')}
+            label={t('step_edit_form.field.blowout.label')}
             className={styles.small_field}
           >
             <BlowoutLocationField
@@ -168,17 +159,49 @@ export const SourceDestFields = (props: SourceDestFieldsProps): JSX.Element => {
                 stepType: formData.stepType,
               })}
             />
+            <FlowRateField
+              {...propsForFields.blowout_flowRate}
+              pipetteId={formData.pipette}
+              flowRateType="blowout"
+              volume={propsForFields.volume?.value ?? 0}
+              tiprack={propsForFields.tipRack.value}
+            />
+            <BlowoutZOffsetField
+              {...propsForFields.blowout_z_offset}
+              sourceLabwareId={propsForFields.aspirate_labware.value}
+              destLabwareId={propsForFields.dispense_labware.value}
+              blowoutLabwareId={propsForFields.blowout_location.value}
+            />
           </CheckboxRowField>
         )}
+
+        <CheckboxRowField
+          {...propsForFields[addFieldNamePrefix('touchTip_checkbox')]}
+          label={t('step_edit_form.field.touchTip.label')}
+          className={styles.small_field}
+        >
+          <TipPositionField
+            propsForFields={propsForFields}
+            zField={`${prefix}_touchTip_mmFromBottom`}
+            labwareId={
+              formData[
+                getLabwareFieldForPositioningField(
+                  addFieldNamePrefix('touchTip_mmFromBottom')
+                )
+              ]
+            }
+          />
+        </CheckboxRowField>
+
         <CheckboxRowField
           {...propsForFields[addFieldNamePrefix('airGap_checkbox')]}
-          label={i18n.t('form.step_edit_form.field.airGap.label')}
+          label={t('step_edit_form.field.airGap.label')}
           className={styles.small_field}
         >
           <TextField
             {...propsForFields[addFieldNamePrefix('airGap_volume')]}
             className={styles.small_field}
-            units={i18n.t('application.units.microliter')}
+            units={t('application:units.microliter')}
           />
         </CheckboxRowField>
       </div>

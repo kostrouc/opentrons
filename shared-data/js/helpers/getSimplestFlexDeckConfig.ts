@@ -2,7 +2,7 @@ import { FLEX_ROBOT_TYPE } from '../constants'
 import { getAddressableAreaFromSlotId } from '../fixtures'
 import { getAddressableAreasInProtocol, getDeckDefFromRobotType } from '.'
 
-import type { AddressableAreaName, CutoutId } from '../../deck'
+import type { AddressableAreaName, CutoutFixtureId, CutoutId } from '../../deck'
 import type { ProtocolAnalysisOutput } from '../../protocol'
 import type {
   CutoutConfig,
@@ -10,6 +10,7 @@ import type {
   DeckDefinition,
   DeckConfiguration,
   CompletedProtocolAnalysis,
+  CutoutFixtureGroup,
 } from '../types'
 
 export interface CutoutConfigProtocolSpec extends CutoutConfig {
@@ -43,7 +44,7 @@ export function getSimplestDeckConfigForProtocol(
 
   const addressableAreas =
     protocolAnalysis != null
-      ? getAddressableAreasInProtocol(protocolAnalysis)
+      ? getAddressableAreasInProtocol(protocolAnalysis, deckDef)
       : []
   const simplestDeckConfig = addressableAreas.reduce<
     CutoutConfigProtocolSpec[]
@@ -80,11 +81,11 @@ export function getSimplestDeckConfigForProtocol(
         ({ cutoutId }) => cutoutId === cutoutIdForAddressableArea
       )
       const previousRequiredAAs = acc[accIndex]?.requiredAddressableAreas
-      const allNextRequiredAddressableAreas = previousRequiredAAs.includes(
-        addressableArea
-      )
-        ? previousRequiredAAs
-        : [...previousRequiredAAs, addressableArea]
+      const allNextRequiredAddressableAreas =
+        previousRequiredAAs != null &&
+        previousRequiredAAs.includes(addressableArea)
+          ? previousRequiredAAs
+          : [...previousRequiredAAs, addressableArea]
       const nextCompatibleCutoutFixture = getSimplestFixtureForAddressableAreas(
         cutoutIdForAddressableArea,
         allNextRequiredAddressableAreas,
@@ -111,7 +112,6 @@ export function getSimplestDeckConfigForProtocol(
     }
     return acc
   }, FLEX_SIMPLEST_DECK_CONFIG_PROTOCOL_SPEC)
-
   return simplestDeckConfig
 }
 
@@ -149,6 +149,15 @@ export function getCutoutIdForSlotName(
       : null
 
   return cutoutIdForSlotName
+}
+
+export function getFixtureGroupForCutoutFixture(
+  cutoutFixtureId: CutoutFixtureId,
+  cutoutFixtures: CutoutFixture[]
+): CutoutFixtureGroup {
+  return (
+    cutoutFixtures.find(cf => cf.id === cutoutFixtureId)?.fixtureGroup ?? {}
+  )
 }
 
 export function getCutoutIdForAddressableArea(

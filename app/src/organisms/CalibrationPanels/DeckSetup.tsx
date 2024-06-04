@@ -3,23 +3,22 @@ import { useTranslation } from 'react-i18next'
 import map from 'lodash/map'
 
 import {
-  RobotWorkSpace,
-  Flex,
-  DIRECTION_COLUMN,
-  JUSTIFY_SPACE_BETWEEN,
   ALIGN_CENTER,
   ALIGN_STRETCH,
-  SPACING,
+  DIRECTION_COLUMN,
+  Flex,
+  JUSTIFY_SPACE_BETWEEN,
   PrimaryButton,
+  RobotWorkSpace,
+  SPACING,
+  StyledText,
 } from '@opentrons/components'
 import {
+  getDeckDefinitions,
   getLabwareDisplayName,
   getPositionFromSlotId,
 } from '@opentrons/shared-data'
-import { getDeckDefinitions } from '@opentrons/components/src/hardware-sim/Deck/getDeckDefinitions'
-
 import * as Sessions from '../../redux/sessions'
-import { StyledText } from '../../atoms/text'
 import { NeedHelpLink } from './NeedHelpLink'
 import { CalibrationLabwareRender } from './CalibrationLabwareRender'
 

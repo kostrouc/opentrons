@@ -1,18 +1,19 @@
-import 'jest-styled-components'
-import { screen, fireEvent } from '@testing-library/react'
 import * as React from 'react'
+import { screen, fireEvent } from '@testing-library/react'
+import '@testing-library/jest-dom/vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { renderWithProviders } from '../../../__testing-utils__'
 
 import {
   ALIGN_CENTER,
   COLORS,
   JUSTIFY_CENTER,
-  renderWithProviders,
   SPACING,
 } from '@opentrons/components'
 
 import { LegacyModalHeader } from '../LegacyModalHeader'
 
-const mockClose = jest.fn()
+const mockClose = vi.fn()
 
 const render = (props: React.ComponentProps<typeof LegacyModalHeader>) => {
   return renderWithProviders(<LegacyModalHeader {...props} />)
@@ -26,27 +27,27 @@ describe('LegacyModalHeader', () => {
       onClose: mockClose,
       title: 'mock modal header title',
       backgroundColor: COLORS.white,
-      color: COLORS.darkBlackEnabled,
+      color: COLORS.black90,
     }
   })
 
   it('should render text and close icon', () => {
     render(props)
     const title = screen.getByText('mock modal header title')
-    expect(title).toHaveStyle(`color: ${COLORS.darkBlackEnabled}`)
+    expect(title).toHaveStyle(`color: ${COLORS.black90}`)
     screen.getByTestId('ModalHeader_icon_close_mock modal header title')
   })
 
   it('should render text, icon, and close icon', () => {
     props.icon = {
       name: 'ot-alert',
-      color: COLORS.darkBlackEnabled,
+      color: COLORS.black90,
       size: '1.25rem',
       marginRight: SPACING.spacing8,
     }
     render(props)
     expect(screen.getByTestId('Modal_header_icon')).toHaveStyle(
-      `color: ${COLORS.darkBlackEnabled}`
+      `color: ${COLORS.black90}`
     )
     expect(screen.getByTestId('Modal_header_icon')).toHaveStyle(
       `width: 1.25rem`
@@ -70,20 +71,6 @@ describe('LegacyModalHeader', () => {
     expect(closeIcon).toHaveStyle(`justify-content: ${JUSTIFY_CENTER}`)
     expect(closeIcon).toHaveStyle(`align-items: ${ALIGN_CENTER}`)
     expect(closeIcon).toHaveStyle('border-radius: 0.875rem')
-    expect(closeIcon).toHaveStyleRule(
-      'background-color',
-      COLORS.lightGreyHover,
-      {
-        modifier: ':hover',
-      }
-    )
-    expect(closeIcon).toHaveStyleRule(
-      'background-color',
-      COLORS.lightGreyPressed,
-      {
-        modifier: ':active',
-      }
-    )
     fireEvent.click(closeIcon)
     expect(mockClose).toHaveBeenCalled()
   })

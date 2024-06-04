@@ -1,5 +1,5 @@
 import type { CutoutFixtureId, CutoutId, AddressableAreaName } from '../deck'
-import type { ModuleType } from './types'
+import type { ModuleModel, ModuleType } from './types'
 
 // constants for dealing with robot coordinate system (eg in labwareTools)
 export const SLOT_LENGTH_MM = 127.76 // along X axis in robot coordinate system
@@ -50,6 +50,7 @@ export const GRIPPER_V1_2: 'gripperV1.2' = 'gripperV1.2'
 export const GRIPPER_MODELS = [GRIPPER_V1, GRIPPER_V1_1, GRIPPER_V1_2]
 
 // robot display name
+export const OT2_DISPLAY_NAME: 'Opentrons OT-2' = 'Opentrons OT-2'
 export const FLEX_DISPLAY_NAME: 'Opentrons Flex' = 'Opentrons Flex'
 
 // pipette display categories
@@ -99,6 +100,12 @@ export const MODULE_MODELS = [
   ...THERMOCYCLER_MODULE_MODELS,
   ...HEATERSHAKER_MODULE_MODELS,
   ...MAGNETIC_BLOCK_MODELS,
+]
+
+export const MODULE_MODELS_OT2_ONLY = [
+  ...MAGNETIC_MODULE_MODELS,
+  TEMPERATURE_MODULE_V1,
+  THERMOCYCLER_MODULE_V1,
 ]
 
 export const MODULE_TYPES = [
@@ -184,6 +191,17 @@ export const TC_MODULE_LOCATION_OT3: 'A1+B1' = 'A1+B1'
 
 export const WEIGHT_OF_96_CHANNEL: '~10kg' = '~10kg'
 
+export const MOVABLE_TRASH_CUTOUTS: CutoutId[] = [
+  'cutoutA1',
+  'cutoutB1',
+  'cutoutC1',
+  'cutoutD1',
+  'cutoutA3',
+  'cutoutB3',
+  'cutoutC3',
+  'cutoutD3',
+]
+
 export const SINGLE_LEFT_CUTOUTS: CutoutId[] = [
   'cutoutA1',
   'cutoutB1',
@@ -211,6 +229,16 @@ export const STAGING_AREA_CUTOUTS: CutoutId[] = [
   'cutoutC3',
   'cutoutD3',
 ]
+
+export const TEMPERATURE_MODULE_CUTOUTS: CutoutId[] = [
+  ...SINGLE_RIGHT_CUTOUTS,
+  ...SINGLE_LEFT_CUTOUTS,
+]
+export const HEATER_SHAKER_CUTOUTS: CutoutId[] = [
+  ...SINGLE_RIGHT_CUTOUTS,
+  ...SINGLE_LEFT_CUTOUTS,
+]
+export const THERMOCYCLER_MODULE_CUTOUTS: CutoutId[] = ['cutoutA1', 'cutoutB1']
 
 export const WASTE_CHUTE_CUTOUT: 'cutoutD3' = 'cutoutD3'
 
@@ -256,6 +284,114 @@ export const NINETY_SIX_CHANNEL_WASTE_CHUTE_ADDRESSABLE_AREA: '96ChannelWasteChu
   '96ChannelWasteChute'
 export const GRIPPER_WASTE_CHUTE_ADDRESSABLE_AREA: 'gripperWasteChute' =
   'gripperWasteChute'
+
+export const THERMOCYCLER_ADDRESSABLE_AREA: 'thermocyclerModuleV2' =
+  'thermocyclerModuleV2'
+export const HEATERSHAKER_A1_ADDRESSABLE_AREA: 'heaterShakerV1A1' =
+  'heaterShakerV1A1'
+export const HEATERSHAKER_B1_ADDRESSABLE_AREA: 'heaterShakerV1B1' =
+  'heaterShakerV1B1'
+export const HEATERSHAKER_C1_ADDRESSABLE_AREA: 'heaterShakerV1C1' =
+  'heaterShakerV1C1'
+export const HEATERSHAKER_D1_ADDRESSABLE_AREA: 'heaterShakerV1D1' =
+  'heaterShakerV1D1'
+export const HEATERSHAKER_A3_ADDRESSABLE_AREA: 'heaterShakerV1A3' =
+  'heaterShakerV1A3'
+export const HEATERSHAKER_B3_ADDRESSABLE_AREA: 'heaterShakerV1B3' =
+  'heaterShakerV1B3'
+export const HEATERSHAKER_C3_ADDRESSABLE_AREA: 'heaterShakerV1C3' =
+  'heaterShakerV1C3'
+export const HEATERSHAKER_D3_ADDRESSABLE_AREA: 'heaterShakerV1D3' =
+  'heaterShakerV1D3'
+export const TEMPERATURE_MODULE_A1_ADDRESSABLE_AREA: 'temperatureModuleV2A1' =
+  'temperatureModuleV2A1'
+export const TEMPERATURE_MODULE_B1_ADDRESSABLE_AREA: 'temperatureModuleV2B1' =
+  'temperatureModuleV2B1'
+export const TEMPERATURE_MODULE_C1_ADDRESSABLE_AREA: 'temperatureModuleV2C1' =
+  'temperatureModuleV2C1'
+export const TEMPERATURE_MODULE_D1_ADDRESSABLE_AREA: 'temperatureModuleV2D1' =
+  'temperatureModuleV2D1'
+export const TEMPERATURE_MODULE_A3_ADDRESSABLE_AREA: 'temperatureModuleV2A3' =
+  'temperatureModuleV2A3'
+export const TEMPERATURE_MODULE_B3_ADDRESSABLE_AREA: 'temperatureModuleV2B3' =
+  'temperatureModuleV2B3'
+export const TEMPERATURE_MODULE_C3_ADDRESSABLE_AREA: 'temperatureModuleV2C3' =
+  'temperatureModuleV2C3'
+export const TEMPERATURE_MODULE_D3_ADDRESSABLE_AREA: 'temperatureModuleV2D3' =
+  'temperatureModuleV2D3'
+
+export const MAGNETIC_BLOCK_A1_ADDRESSABLE_AREA: 'magneticBlockV1A1' =
+  'magneticBlockV1A1'
+export const MAGNETIC_BLOCK_B1_ADDRESSABLE_AREA: 'magneticBlockV1B1' =
+  'magneticBlockV1B1'
+export const MAGNETIC_BLOCK_C1_ADDRESSABLE_AREA: 'magneticBlockV1C1' =
+  'magneticBlockV1C1'
+export const MAGNETIC_BLOCK_D1_ADDRESSABLE_AREA: 'magneticBlockV1D1' =
+  'magneticBlockV1D1'
+export const MAGNETIC_BLOCK_A2_ADDRESSABLE_AREA: 'magneticBlockV1A2' =
+  'magneticBlockV1A2'
+export const MAGNETIC_BLOCK_B2_ADDRESSABLE_AREA: 'magneticBlockV1B2' =
+  'magneticBlockV1B2'
+export const MAGNETIC_BLOCK_C2_ADDRESSABLE_AREA: 'magneticBlockV1C2' =
+  'magneticBlockV1C2'
+export const MAGNETIC_BLOCK_D2_ADDRESSABLE_AREA: 'magneticBlockV1D2' =
+  'magneticBlockV1D2'
+export const MAGNETIC_BLOCK_A3_ADDRESSABLE_AREA: 'magneticBlockV1A3' =
+  'magneticBlockV1A3'
+export const MAGNETIC_BLOCK_B3_ADDRESSABLE_AREA: 'magneticBlockV1B3' =
+  'magneticBlockV1B3'
+export const MAGNETIC_BLOCK_C3_ADDRESSABLE_AREA: 'magneticBlockV1C3' =
+  'magneticBlockV1C3'
+export const MAGNETIC_BLOCK_D3_ADDRESSABLE_AREA: 'magneticBlockV1D3' =
+  'magneticBlockV1D3'
+
+export const MAGNETIC_BLOCK_ADDRESSABLE_AREAS: AddressableAreaName[] = [
+  MAGNETIC_BLOCK_A1_ADDRESSABLE_AREA,
+  MAGNETIC_BLOCK_B1_ADDRESSABLE_AREA,
+  MAGNETIC_BLOCK_C1_ADDRESSABLE_AREA,
+  MAGNETIC_BLOCK_D1_ADDRESSABLE_AREA,
+  MAGNETIC_BLOCK_A2_ADDRESSABLE_AREA,
+  MAGNETIC_BLOCK_B2_ADDRESSABLE_AREA,
+  MAGNETIC_BLOCK_C2_ADDRESSABLE_AREA,
+  MAGNETIC_BLOCK_D2_ADDRESSABLE_AREA,
+  MAGNETIC_BLOCK_A3_ADDRESSABLE_AREA,
+  MAGNETIC_BLOCK_B3_ADDRESSABLE_AREA,
+  MAGNETIC_BLOCK_C3_ADDRESSABLE_AREA,
+  MAGNETIC_BLOCK_D3_ADDRESSABLE_AREA,
+]
+
+export const TEMPERATURE_MODULE_ADDRESSABLE_AREAS: AddressableAreaName[] = [
+  TEMPERATURE_MODULE_A1_ADDRESSABLE_AREA,
+  TEMPERATURE_MODULE_B1_ADDRESSABLE_AREA,
+  TEMPERATURE_MODULE_C1_ADDRESSABLE_AREA,
+  TEMPERATURE_MODULE_D1_ADDRESSABLE_AREA,
+  TEMPERATURE_MODULE_A3_ADDRESSABLE_AREA,
+  TEMPERATURE_MODULE_B3_ADDRESSABLE_AREA,
+  TEMPERATURE_MODULE_C3_ADDRESSABLE_AREA,
+  TEMPERATURE_MODULE_D3_ADDRESSABLE_AREA,
+]
+
+export const HEATERSHAKER_ADDRESSABLE_AREAS: AddressableAreaName[] = [
+  HEATERSHAKER_A1_ADDRESSABLE_AREA,
+  HEATERSHAKER_B1_ADDRESSABLE_AREA,
+  HEATERSHAKER_C1_ADDRESSABLE_AREA,
+  HEATERSHAKER_D1_ADDRESSABLE_AREA,
+  HEATERSHAKER_A3_ADDRESSABLE_AREA,
+  HEATERSHAKER_B3_ADDRESSABLE_AREA,
+  HEATERSHAKER_C3_ADDRESSABLE_AREA,
+  HEATERSHAKER_D3_ADDRESSABLE_AREA,
+]
+
+export const FLEX_USB_MODULE_ADDRESSABLE_AREAS: AddressableAreaName[] = [
+  THERMOCYCLER_ADDRESSABLE_AREA,
+  ...HEATERSHAKER_ADDRESSABLE_AREAS,
+  ...TEMPERATURE_MODULE_ADDRESSABLE_AREAS,
+]
+
+export const FLEX_MODULE_ADDRESSABLE_AREAS: AddressableAreaName[] = [
+  ...FLEX_USB_MODULE_ADDRESSABLE_AREAS,
+  ...MAGNETIC_BLOCK_ADDRESSABLE_AREAS,
+]
 
 export const ADDRESSABLE_AREA_1: '1' = '1'
 export const ADDRESSABLE_AREA_2: '2' = '2'
@@ -341,6 +477,42 @@ export const STAGING_AREA_SLOT_WITH_WASTE_CHUTE_RIGHT_ADAPTER_COVERED_FIXTURE: '
 export const STAGING_AREA_SLOT_WITH_WASTE_CHUTE_RIGHT_ADAPTER_NO_COVER_FIXTURE: 'stagingAreaSlotWithWasteChuteRightAdapterNoCover' =
   'stagingAreaSlotWithWasteChuteRightAdapterNoCover'
 
+export const HEATERSHAKER_MODULE_V1_FIXTURE: 'heaterShakerModuleV1' =
+  'heaterShakerModuleV1'
+export const TEMPERATURE_MODULE_V2_FIXTURE: 'temperatureModuleV2' =
+  'temperatureModuleV2'
+export const MAGNETIC_BLOCK_V1_FIXTURE: 'magneticBlockV1' = 'magneticBlockV1'
+export const STAGING_AREA_SLOT_WITH_MAGNETIC_BLOCK_V1_FIXTURE: 'stagingAreaSlotWithMagneticBlockV1' =
+  'stagingAreaSlotWithMagneticBlockV1'
+export const THERMOCYCLER_V2_REAR_FIXTURE: 'thermocyclerModuleV2Rear' =
+  'thermocyclerModuleV2Rear'
+export const THERMOCYCLER_V2_FRONT_FIXTURE: 'thermocyclerModuleV2Front' =
+  'thermocyclerModuleV2Front'
+
+export const MODULE_FIXTURES_BY_MODEL: {
+  [moduleModel in ModuleModel]?: CutoutFixtureId[]
+} = {
+  [HEATERSHAKER_MODULE_V1]: [HEATERSHAKER_MODULE_V1_FIXTURE],
+  [TEMPERATURE_MODULE_V2]: [TEMPERATURE_MODULE_V2_FIXTURE],
+  [MAGNETIC_BLOCK_V1]: [MAGNETIC_BLOCK_V1_FIXTURE],
+  [THERMOCYCLER_MODULE_V2]: [
+    THERMOCYCLER_V2_REAR_FIXTURE,
+    THERMOCYCLER_V2_FRONT_FIXTURE,
+  ],
+}
+
+export const FLEX_USB_MODULE_FIXTURES: CutoutFixtureId[] = [
+  HEATERSHAKER_MODULE_V1_FIXTURE,
+  TEMPERATURE_MODULE_V2_FIXTURE,
+  THERMOCYCLER_V2_REAR_FIXTURE,
+  THERMOCYCLER_V2_FRONT_FIXTURE,
+]
+
+export const MAGNETIC_BLOCK_FIXTURES: CutoutFixtureId[] = [
+  MAGNETIC_BLOCK_V1_FIXTURE,
+  STAGING_AREA_SLOT_WITH_MAGNETIC_BLOCK_V1_FIXTURE,
+]
+
 export const SINGLE_SLOT_FIXTURES: CutoutFixtureId[] = [
   SINGLE_LEFT_SLOT_FIXTURE,
   SINGLE_CENTER_SLOT_FIXTURE,
@@ -365,3 +537,29 @@ export const WASTE_CHUTE_STAGING_AREA_FIXTURES: CutoutFixtureId[] = [
 ]
 
 export const LOW_VOLUME_PIPETTES = ['p50_single_flex', 'p50_multi_flex']
+
+// default hex values for liquid colors
+const electricPurple = '#b925ff'
+const goldenYellow = '#ffd600'
+const aquamarine = '#9dffd8'
+const orangePeel = '#ff9900'
+const skyBlue = '#50d5ff'
+const popPink = '#ff80f5'
+const springGreen = '#7eff42'
+const tartRed = '#ff4f4f'
+export const DEFAULT_LIQUID_COLORS = [
+  electricPurple,
+  goldenYellow,
+  aquamarine,
+  orangePeel,
+  skyBlue,
+  popPink,
+  springGreen,
+  tartRed,
+]
+export const DEPRECATED_WHALE_GREY = '#9395a0'
+
+// this can't go in @opentrons/components because its used in a utility
+// method in PD (not react code) and we do not want non react code loading
+// react code because the web worker context does not play nicely with react
+export const INTERACTIVE_WELL_DATA_ATTRIBUTE = 'data-wellname'

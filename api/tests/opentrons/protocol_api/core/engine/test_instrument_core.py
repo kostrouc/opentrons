@@ -19,6 +19,7 @@ from opentrons.protocol_engine import (
     DropTipWellLocation,
     DropTipWellOrigin,
 )
+from opentrons.protocol_engine.clients.sync_client import SyncClient
 from opentrons.protocol_engine.errors.exceptions import TipNotAttachedError
 from opentrons.protocol_engine.clients import SyncClient as EngineClient
 from opentrons.protocol_engine.types import (
@@ -28,6 +29,12 @@ from opentrons.protocol_engine.types import (
     RowNozzleLayoutConfiguration,
     SingleNozzleLayoutConfiguration,
     ColumnNozzleLayoutConfiguration,
+    AddressableOffsetVector,
+)
+from opentrons.protocol_api.disposal_locations import (
+    TrashBin,
+    WasteChute,
+    DisposalOffset,
 )
 from opentrons.protocol_api._nozzle_layout import NozzleLayout
 from opentrons.protocol_api.core.engine import (
@@ -36,6 +43,8 @@ from opentrons.protocol_api.core.engine import (
     ProtocolCore,
     deck_conflict,
 )
+from opentrons.protocols.api_support.definitions import MAX_SUPPORTED_VERSION
+from opentrons.protocols.api_support.types import APIVersion
 from opentrons.types import Location, Mount, MountType, Point
 
 
@@ -267,7 +276,7 @@ def test_pick_up_tip(
                 origin=WellOrigin.TOP, offset=WellOffset(x=3, y=2, z=1)
             ),
         ),
-        mock_engine_client.pick_up_tip(
+        mock_engine_client.pick_up_tip_wait_for_recovery(
             pipette_id="abc123",
             labware_id="labware-id",
             well_name="well-name",
@@ -377,6 +386,68 @@ def test_drop_tip_with_location(
             ),
             home_after=True,
             alternateDropLocation=False,
+        ),
+    )
+
+
+def test_drop_tip_in_trash_bin(
+    decoy: Decoy, mock_engine_client: EngineClient, subject: InstrumentCore
+) -> None:
+    """It should move to the trash bin and drop the tip in place."""
+    trash_bin = decoy.mock(cls=TrashBin)
+
+    decoy.when(trash_bin.offset).then_return(DisposalOffset(x=1, y=2, z=3))
+    decoy.when(trash_bin.area_name).then_return("my tubular area")
+
+    subject.drop_tip_in_disposal_location(
+        trash_bin, home_after=True, alternate_tip_drop=True
+    )
+
+    decoy.verify(
+        mock_engine_client.move_to_addressable_area_for_drop_tip(
+            pipette_id="abc123",
+            addressable_area_name="my tubular area",
+            offset=AddressableOffsetVector(x=1, y=2, z=3),
+            force_direct=False,
+            speed=None,
+            minimum_z_height=None,
+            alternate_drop_location=True,
+            ignore_tip_configuration=True,
+        ),
+        mock_engine_client.drop_tip_in_place(
+            pipette_id="abc123",
+            home_after=True,
+        ),
+    )
+
+
+def test_drop_tip_in_waste_chute(
+    decoy: Decoy, mock_engine_client: EngineClient, subject: InstrumentCore
+) -> None:
+    """It should move to the trash bin and drop the tip in place."""
+    waste_chute = decoy.mock(cls=WasteChute)
+
+    decoy.when(waste_chute.offset).then_return(DisposalOffset(x=4, y=5, z=6))
+    decoy.when(
+        mock_engine_client.state.tips.get_pipette_channels("abc123")
+    ).then_return(96)
+
+    subject.drop_tip_in_disposal_location(
+        waste_chute, home_after=True, alternate_tip_drop=True
+    )
+
+    decoy.verify(
+        mock_engine_client.move_to_addressable_area(
+            pipette_id="abc123",
+            addressable_area_name="96ChannelWasteChute",
+            offset=AddressableOffsetVector(x=4, y=5, z=6),
+            force_direct=False,
+            speed=None,
+            minimum_z_height=None,
+        ),
+        mock_engine_client.drop_tip_in_place(
+            pipette_id="abc123",
+            home_after=True,
         ),
     )
 
@@ -600,6 +671,8 @@ def test_dispense_to_well(
         name="my cool well", labware_id="123abc", engine_client=mock_engine_client
     )
 
+    decoy.when(mock_protocol_core.api_version).then_return(MAX_SUPPORTED_VERSION)
+
     decoy.when(
         mock_engine_client.state.geometry.get_relative_well_location(
             labware_id="123abc", well_name="my cool well", absolute_point=Point(1, 2, 3)
@@ -648,6 +721,7 @@ def test_dispense_in_place(
     subject: InstrumentCore,
 ) -> None:
     """It should dispense in place."""
+    decoy.when(mock_protocol_core.api_version).then_return(MAX_SUPPORTED_VERSION)
     location = Location(point=Point(1, 2, 3), labware=None)
     subject.dispense(
         volume=12.34,
@@ -673,6 +747,7 @@ def test_dispense_to_coordinates(
     subject: InstrumentCore,
 ) -> None:
     """It should dispense in place."""
+    decoy.when(mock_protocol_core.api_version).then_return(MAX_SUPPORTED_VERSION)
     location = Location(point=Point(1, 2, 3), labware=None)
     subject.dispense(
         volume=12.34,
@@ -696,6 +771,51 @@ def test_dispense_to_coordinates(
             pipette_id="abc123", volume=12.34, flow_rate=7.8, push_out=None
         ),
     )
+
+
+@pytest.mark.parametrize(
+    ("api_version", "expect_clampage"),
+    [(APIVersion(2, 16), True), (APIVersion(2, 17), False)],
+)
+def test_dispense_conditionally_clamps_volume(
+    api_version: APIVersion,
+    expect_clampage: bool,
+    decoy: Decoy,
+    subject: InstrumentCore,
+    mock_protocol_core: ProtocolCore,
+    mock_engine_client: SyncClient,
+) -> None:
+    """It should clamp the dispensed volume to the available volume on older API versions."""
+    decoy.when(mock_protocol_core.api_version).then_return(api_version)
+    decoy.when(
+        mock_engine_client.state.pipettes.get_aspirated_volume(subject.pipette_id)
+    ).then_return(111.111)
+
+    subject.dispense(
+        volume=99999999.99999999,
+        rate=5.6,
+        flow_rate=7.8,
+        well_core=None,
+        location=Location(point=Point(1, 2, 3), labware=None),
+        in_place=True,
+        push_out=None,
+    )
+
+    if expect_clampage:
+        decoy.verify(
+            mock_engine_client.dispense_in_place(
+                pipette_id="abc123", volume=111.111, flow_rate=7.8, push_out=None
+            ),
+        )
+    else:
+        decoy.verify(
+            mock_engine_client.dispense_in_place(
+                pipette_id="abc123",
+                volume=99999999.99999999,
+                flow_rate=7.8,
+                push_out=None,
+            ),
+        )
 
 
 def test_initialization_sets_default_movement_speed(
@@ -1019,11 +1139,11 @@ def test_configure_nozzle_layout(
     argvalues=[
         (96, NozzleConfigurationType.FULL, "A1", True),
         (96, NozzleConfigurationType.FULL, None, True),
-        (96, NozzleConfigurationType.ROW, "A1", False),
-        (96, NozzleConfigurationType.COLUMN, "A1", False),
+        (96, NozzleConfigurationType.ROW, "A1", True),
+        (96, NozzleConfigurationType.COLUMN, "A1", True),
         (96, NozzleConfigurationType.COLUMN, "A12", True),
-        (96, NozzleConfigurationType.SINGLE, "H12", False),
-        (96, NozzleConfigurationType.SINGLE, "A1", False),
+        (96, NozzleConfigurationType.SINGLE, "H12", True),
+        (96, NozzleConfigurationType.SINGLE, "A1", True),
         (8, NozzleConfigurationType.FULL, "A1", True),
         (8, NozzleConfigurationType.FULL, None, True),
         (8, NozzleConfigurationType.SINGLE, "H1", True),

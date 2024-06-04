@@ -1,7 +1,7 @@
 import logging
 from typing import Dict, List, Optional, Set, Union, cast, Tuple
 
-from opentrons_shared_data.deck.dev_types import DeckDefinitionV4, SlotDefV3
+from opentrons_shared_data.deck.dev_types import DeckDefinitionV5, SlotDefV3
 from opentrons_shared_data.labware.dev_types import LabwareDefinition
 from opentrons_shared_data.pipette.dev_types import PipetteNameType
 from opentrons_shared_data.robot.dev_types import RobotType
@@ -16,10 +16,9 @@ from opentrons.protocols.api_support.util import AxisMaxSpeeds, APIVersionError
 from opentrons.protocols import labware as labware_definition
 
 from ...labware import Labware
+from ...disposal_locations import TrashBin, WasteChute
 from ..._liquid import Liquid
 from ..._types import OffDeckType
-from ..._trash_bin import TrashBin
-from ..._waste_chute import WasteChute
 from ..protocol import AbstractProtocol
 from ..labware import LabwareLoadParams
 
@@ -134,7 +133,8 @@ class LegacyProtocolCore(
         return self._sync_hardware.is_simulator  # type: ignore[no-any-return]
 
     def append_disposal_location(
-        self, disposal_location: Union[Labware, TrashBin, WasteChute]
+        self,
+        disposal_location: Union[Labware, TrashBin, WasteChute],
     ) -> None:
         if isinstance(disposal_location, (TrashBin, WasteChute)):
             raise APIVersionError(
@@ -378,6 +378,21 @@ class LegacyProtocolCore(
 
         return new_instr
 
+    def load_trash_bin(self, slot_name: DeckSlotName, area_name: str) -> TrashBin:
+        raise APIVersionError(
+            "Loading deck configured trash bin is not supported in this API version."
+        )
+
+    def load_ot2_fixed_trash_bin(self) -> None:
+        raise APIVersionError(
+            "Loading deck configured OT-2 fixed trash bin is not supported in this API version."
+        )
+
+    def load_waste_chute(self) -> WasteChute:
+        raise APIVersionError(
+            "Loading waste chute is not supported in this API version."
+        )
+
     def get_loaded_instruments(
         self,
     ) -> Dict[Mount, Optional[LegacyInstrumentCore]]:
@@ -476,7 +491,7 @@ class LegacyProtocolCore(
     ) -> Optional[LegacyLabwareCore]:
         assert False, "get_labware_on_labware only supported on engine core"
 
-    def get_deck_definition(self) -> DeckDefinitionV4:
+    def get_deck_definition(self) -> DeckDefinitionV5:
         """Get the geometry definition of the robot's deck."""
         assert False, "get_deck_definition only supported on engine core"
 

@@ -1,16 +1,17 @@
 import * as React from 'react'
 import { fireEvent, screen } from '@testing-library/react'
+import { vi, it, describe, expect, beforeEach } from 'vitest'
 
-import { renderWithProviders } from '@opentrons/components'
-import { SmallButton } from '../../../atoms/buttons'
+import { renderWithProviders } from '../../../__testing-utils__'
 import { ChildNavigation } from '..'
+import type { SmallButton } from '../../../atoms/buttons'
 
 const render = (props: React.ComponentProps<typeof ChildNavigation>) =>
   renderWithProviders(<ChildNavigation {...props} />)
 
-const mockOnClickBack = jest.fn()
-const mockOnClickButton = jest.fn()
-const mockOnClickSecondaryButton = jest.fn()
+const mockOnClickBack = vi.fn()
+const mockOnClickButton = vi.fn()
+const mockOnClickSecondaryButton = vi.fn()
 
 const mockSecondaryButtonProps: React.ComponentProps<typeof SmallButton> = {
   onClick: mockOnClickSecondaryButton,
@@ -70,5 +71,27 @@ describe('ChildNavigation', () => {
     const secondaryButton = screen.getByText('Setup Instructions')
     fireEvent.click(secondaryButton)
     expect(mockOnClickSecondaryButton).toHaveBeenCalled()
+  })
+  it.fails(
+    'should not render back button if onClickBack does not exist',
+    () => {
+      props = {
+        ...props,
+        onClickBack: undefined,
+      }
+      render(props)
+      screen.getByTestId('ChildNavigation_Back_Button')
+    }
+  )
+  it('should render button as disabled', () => {
+    props = {
+      ...props,
+      buttonText: 'mock button',
+      onClickButton: mockOnClickButton,
+      buttonIsDisabled: true,
+    }
+    render(props)
+    const button = screen.getByTestId('ChildNavigation_Primary_Button')
+    expect(button).toBeDisabled()
   })
 })

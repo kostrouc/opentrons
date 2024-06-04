@@ -7,7 +7,11 @@ export type UpdateChannel = 'latest' | 'beta' | 'alpha'
 
 export type DiscoveryCandidates = string[]
 
-export type DevInternalFlag = 'protocolStats'
+export type DevInternalFlag =
+  | 'forceHttpPolling'
+  | 'protocolStats'
+  | 'enableRunNotes'
+  | 'enableQuickTransfer'
 
 export type FeatureFlags = Partial<Record<DevInternalFlag, boolean | undefined>>
 

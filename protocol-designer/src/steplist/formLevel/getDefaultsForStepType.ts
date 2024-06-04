@@ -4,8 +4,9 @@ import {
   DEFAULT_WELL_ORDER_FIRST_OPTION,
   DEFAULT_WELL_ORDER_SECOND_OPTION,
   DEFAULT_DELAY_SECONDS,
+  DEFAULT_MM_BLOWOUT_OFFSET_FROM_TOP,
 } from '../../constants'
-import { StepType, StepFieldName } from '../../form-types'
+import type { StepType, StepFieldName } from '../../form-types'
 export function getDefaultsForStepType(
   stepType: StepType
 ): Record<StepFieldName, any> {
@@ -36,12 +37,18 @@ export function getDefaultsForStepType(
         mix_touchTip_mmFromBottom: null,
         dropTip_location: null,
         nozzles: null,
+        tipRack: null,
+        mix_x_position: 0,
+        mix_y_position: 0,
+        blowout_z_offset: DEFAULT_MM_BLOWOUT_OFFSET_FROM_TOP,
+        blowout_flowRate: null,
       }
 
     case 'moveLiquid':
       return {
         pipette: null,
         volume: null,
+        tipRack: null,
         changeTip: DEFAULT_CHANGE_TIP_OPTION,
         path: 'single',
         aspirate_wells_grouped: false,
@@ -84,6 +91,12 @@ export function getDefaultsForStepType(
         dispense_delay_mmFromBottom: null,
         dropTip_location: null,
         nozzles: null,
+        dispense_x_position: 0,
+        dispense_y_position: 0,
+        aspirate_x_position: 0,
+        aspirate_y_position: 0,
+        blowout_z_offset: DEFAULT_MM_BLOWOUT_OFFSET_FROM_TOP,
+        blowout_flowRate: null,
       }
 
     case 'moveLabware':

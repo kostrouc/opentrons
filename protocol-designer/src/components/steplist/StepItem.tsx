@@ -1,5 +1,6 @@
 import * as React from 'react'
 import cx from 'classnames'
+import { useTranslation } from 'react-i18next'
 import sum from 'lodash/sum'
 import { Icon } from '@opentrons/components'
 import {
@@ -8,17 +9,8 @@ import {
   TEMPERATURE_MODULE_TYPE,
   THERMOCYCLER_MODULE_TYPE,
 } from '@opentrons/shared-data'
-import { AtomicProfileStep } from '@opentrons/shared-data/protocol/types/schemaV4'
 import { THERMOCYCLER_PROFILE, THERMOCYCLER_STATE } from '../../constants'
-import {
-  stepIconsByType,
-  PROFILE_CYCLE,
-  FormData,
-  StepType,
-  ProfileCycleItem,
-  ProfileStepItem,
-} from '../../form-types'
-import { i18n } from '../../localization'
+import { stepIconsByType, PROFILE_CYCLE } from '../../form-types'
 import {
   makeLidLabelText,
   makeSpeedText,
@@ -31,17 +23,25 @@ import { AspirateDispenseHeader } from './AspirateDispenseHeader'
 import { MixHeader } from './MixHeader'
 import { ModuleStepItems, ModuleStepItemRow } from './ModuleStepItems'
 import { PauseStepItems } from './PauseStepItems'
+import { MoveLabwareHeader } from './MoveLabwareHeader'
 import { SourceDestSubstep } from './SourceDestSubstep'
-import styles from './StepItem.css'
+import styles from './StepItem.module.css'
 
-import {
+import type { AdditionalEquipmentEntities } from '@opentrons/step-generation'
+import type { AtomicProfileStep } from '@opentrons/shared-data/protocol/types/schemaV4'
+import type {
+  FormData,
+  StepType,
+  ProfileCycleItem,
+  ProfileStepItem,
+} from '../../form-types'
+import type {
   SubstepIdentifier,
   SubstepItemData,
   ThermocyclerProfileSubstepItem,
   WellIngredientNames,
 } from '../../steplist/types'
-import { MoveLabwareHeader } from './MoveLabwareHeader'
-import type { AdditionalEquipmentEntities } from '@opentrons/step-generation'
+import type { InitialDeckSetup } from '../../step-forms'
 
 export interface StepItemProps {
   description?: string | null
@@ -85,7 +85,7 @@ export const StepItem = (props: StepItemProps): JSX.Element => {
     highlightStep,
     isMultiSelectMode,
   } = props
-
+  const { t } = useTranslation('application')
   const iconName = stepIconsByType[stepType]
   let iconClassName = ''
   if (error) {
@@ -104,9 +104,7 @@ export const StepItem = (props: StepItemProps): JSX.Element => {
       iconName={error || warning ? 'alert-circle' : iconName}
       iconProps={{ className: iconClassName }}
       data-test={`StepItem_${stepNumber}`}
-      title={`${stepNumber}. ${
-        props.title || i18n.t(`application.stepType.${stepType}`)
-      }`}
+      title={`${stepNumber}. ${props.title || t(`stepType.${stepType}`)}`}
       onClick={handleClick}
       onContextMenu={onStepContextMenu}
       onMouseEnter={highlightStep}
@@ -123,11 +121,10 @@ export interface StepItemContentsProps {
   rawForm: FormData | null | undefined
   stepType: StepType
   substeps: SubstepItemData | null | undefined
-
   ingredNames: WellIngredientNames
   labwareNicknamesById: { [labwareId: string]: string }
   additionalEquipmentEntities: AdditionalEquipmentEntities
-
+  modules: InitialDeckSetup['modules']
   highlightSubstep: (substepIdentifier: SubstepIdentifier) => unknown
   hoveredSubstep: SubstepIdentifier | null | undefined
 }
@@ -148,6 +145,7 @@ interface ProfileStepSubstepRowProps {
 export const ProfileStepSubstepRow = (
   props: ProfileStepSubstepRowProps
 ): JSX.Element => {
+  const { t } = useTranslation(['modules', 'application'])
   const { repetitionsDisplay, stepNumber } = props
   const { temperature, durationMinutes, durationSeconds } = props.step
   return (
@@ -167,7 +165,7 @@ export const ProfileStepSubstepRow = (
         {stepNumber}
       </span>
       <span className={styles.profile_block_temp}>
-        {makeTemperatureText(temperature)}
+        {makeTemperatureText(temperature, t)}
       </span>
       <span
         className={cx(
@@ -192,11 +190,13 @@ interface ProfileCycleRowProps {
 }
 const ProfileCycleRow = (props: ProfileCycleRowProps): JSX.Element => {
   const { step, stepNumber } = props
+  const { t } = useTranslation(['modules', 'application'])
+
   return (
     <div className={styles.cycle_step_row}>
       <span className={styles.profile_step_number}>{stepNumber}</span>
       <span className={styles.profile_block_temp}>
-        {makeTemperatureText(step.temperature)}
+        {makeTemperatureText(step.temperature, t)}
       </span>
       <span className={styles.align_right}>
         {makeDurationText(step.durationMinutes, step.durationSeconds)}
@@ -292,6 +292,7 @@ export const StepItemContents = (
   props: StepItemContentsProps
 ): JSX.Element | JSX.Element[] | null => {
   const {
+    modules,
     rawForm,
     stepType,
     substeps,
@@ -301,7 +302,7 @@ export const StepItemContents = (
     hoveredSubstep,
     additionalEquipmentEntities,
   } = props
-
+  const { t } = useTranslation(['modules', 'application'])
   if (!rawForm) {
     return null
   }
@@ -316,58 +317,58 @@ export const StepItemContents = (
       <ModuleStepItems
         labwareNickname={substeps.labwareNickname}
         message={substeps.message}
-        action={i18n.t(`modules.actions.action`)}
-        actionText={i18n.t(
-          `modules.actions.${substeps.engage ? 'engage' : 'disengage'}`
-        )}
+        action={t(`actions.action`)}
+        actionText={t(`actions.${substeps.engage ? 'engage' : 'disengage'}`)}
         moduleType={MAGNETIC_MODULE_TYPE}
       />
     )
   }
 
   if (substeps && substeps.substepType === 'temperature') {
-    const temperature = makeTemperatureText(substeps.temperature)
+    const temperature = makeTemperatureText(substeps.temperature, t)
+    const moduleSlot =
+      substeps.moduleId != null ? modules[substeps.moduleId].slot : ''
 
     return (
       <ModuleStepItems
         message={substeps.message}
-        action={i18n.t(`modules.actions.go_to`)}
+        action={t(`actions.go_to`)}
         actionText={temperature}
         moduleType={TEMPERATURE_MODULE_TYPE}
         labwareNickname={substeps.labwareNickname}
+        moduleSlot={moduleSlot}
       />
     )
   }
 
   if (substeps && substeps.substepType === 'heaterShaker') {
     const temperature = makeTemperatureText(
-      substeps.targetHeaterShakerTemperature
+      substeps.targetHeaterShakerTemperature,
+      t
     )
-    const shakerValue = makeSpeedText(substeps.targetSpeed)
+    const shakerValue = makeSpeedText(substeps.targetSpeed, t)
     const timer = makeTimerText(
       substeps.heaterShakerTimerMinutes,
-      substeps.heaterShakerTimerSeconds
+      substeps.heaterShakerTimerSeconds,
+      t
     )
 
     return (
       <ModuleStepItems
-        action={i18n.t(`modules.actions.go_to`)}
+        action={t(`actions.go_to`)}
         actionText={temperature}
         moduleType={HEATERSHAKER_MODULE_TYPE}
         labwareNickname={substeps.labwareNickname}
       >
         <ModuleStepItemRow
-          label={i18n.t(`modules.labware_latch`)}
+          label={t(`labware_latch`)}
           value={
             substeps.latchOpen
-              ? i18n.t(`modules.actions.open`)
-              : i18n.t(`modules.actions.closed_and_locked`)
+              ? t(`actions.open`)
+              : t(`actions.closed_and_locked`)
           }
         />
-        <ModuleStepItemRow
-          label={i18n.t(`modules.shaker_label`)}
-          value={shakerValue}
-        />
+        <ModuleStepItemRow label={t(`shaker_label`)} value={shakerValue} />
         {substeps.heaterShakerTimerMinutes === 0 &&
         substeps.heaterShakerTimerSeconds === 0 ? null : (
           <PDListItem
@@ -377,7 +378,7 @@ export const StepItemContents = (
             )}
           >
             <span className={styles.labware_display_name}>
-              {i18n.t(`modules.actions.deactivate_after`)}
+              {t(`actions.deactivate_after`)}
             </span>
             <span className={styles.align_right}>{timer}</span>
           </PDListItem>
@@ -390,15 +391,15 @@ export const StepItemContents = (
     return (
       <ModuleStepItems
         message={substeps.message}
-        action={i18n.t(`modules.actions.profile`)}
-        actionText={i18n.t(`modules.actions.cycling`)}
+        action={t(`actions.profile`)}
+        actionText={t(`actions.cycling`)}
         moduleType={THERMOCYCLER_MODULE_TYPE}
         labwareNickname={substeps.labwareNickname}
       >
         <ModuleStepItemRow
           // NOTE: for TC Profile, lid label text always says "closed" bc Profile runs with lid closed.
-          label={makeLidLabelText(false)}
-          value={makeTemperatureText(substeps.profileTargetLidTemp)}
+          label={makeLidLabelText(false, t)}
+          value={makeTemperatureText(substeps.profileTargetLidTemp, t)}
         />
         <CollapsibleSubstep
           headerContent={
@@ -439,14 +440,14 @@ export const StepItemContents = (
           }
         >
           <ModuleStepItems
-            actionText={makeTemperatureText(substeps.blockTargetTempHold)}
+            actionText={makeTemperatureText(substeps.blockTargetTempHold, t)}
             moduleType={THERMOCYCLER_MODULE_TYPE}
             hideHeader
             labwareNickname={substeps.labwareNickname}
           />
           <ModuleStepItemRow
-            label={makeLidLabelText(substeps.lidOpenHold)}
-            value={makeTemperatureText(substeps.lidTargetTempHold)}
+            label={makeLidLabelText(substeps.lidOpenHold, t)}
+            value={makeTemperatureText(substeps.lidTargetTempHold, t)}
           />
         </CollapsibleSubstep>
       </ModuleStepItems>
@@ -454,14 +455,14 @@ export const StepItemContents = (
   }
 
   if (substeps && substeps.substepType === THERMOCYCLER_STATE) {
-    const blockTemperature = makeTemperatureText(substeps.blockTargetTemp)
-    const lidTemperature = makeTemperatureText(substeps.lidTargetTemp)
-    const lidLabelText = makeLidLabelText(substeps.lidOpen)
+    const blockTemperature = makeTemperatureText(substeps.blockTargetTemp, t)
+    const lidTemperature = makeTemperatureText(substeps.lidTargetTemp, t)
+    const lidLabelText = makeLidLabelText(substeps.lidOpen, t)
 
     return (
       <ModuleStepItems
         message={substeps.message}
-        action={i18n.t(`modules.actions.hold`)}
+        action={t(`actions.hold`)}
         actionText={blockTemperature}
         moduleType={THERMOCYCLER_MODULE_TYPE}
         labwareNickname={substeps.labwareNickname}
@@ -472,12 +473,12 @@ export const StepItemContents = (
   }
 
   if (substeps && substeps.substepType === 'waitForTemperature') {
-    const temperature = makeTemperatureText(substeps.temperature)
+    const temperature = makeTemperatureText(substeps.temperature, t)
 
     return (
       <ModuleStepItems
         message={substeps.message}
-        action={i18n.t('modules.actions.await_temperature')}
+        action={t('actions.await_temperature')}
         actionText={temperature}
         moduleType={substeps.moduleType}
         labwareNickname={substeps.labwareNickname}

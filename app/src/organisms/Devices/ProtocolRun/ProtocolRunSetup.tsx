@@ -14,13 +14,14 @@ import {
   Icon,
   Link,
   SPACING,
+  StyledText,
   TYPOGRAPHY,
 } from '@opentrons/components'
 import { FLEX_ROBOT_TYPE, OT2_ROBOT_TYPE } from '@opentrons/shared-data'
 
 import { Line } from '../../../atoms/structure'
-import { StyledText } from '../../../atoms/text'
 import { InfoMessage } from '../../../molecules/InfoMessage'
+import { INCOMPATIBLE, INEXACT_MATCH } from '../../../redux/pipettes'
 import {
   getIsFixtureMismatch,
   getRequiredDeckConfig,
@@ -33,6 +34,7 @@ import {
   useRobot,
   useRunCalibrationStatus,
   useRunHasStarted,
+  useRunPipetteInfoByMount,
   useStoredProtocolAnalysis,
   useUnmatchedModulesForProtocol,
 } from '../hooks'
@@ -93,6 +95,20 @@ export function ProtocolRunSetup({
     robotType,
     protocolAnalysis
   )
+  const runPipetteInfoByMount = useRunPipetteInfoByMount(runId)
+
+  const isMissingPipette =
+    (runPipetteInfoByMount.left != null &&
+      runPipetteInfoByMount.left.requestedPipetteMatch === INCOMPATIBLE) ||
+    (runPipetteInfoByMount.right != null &&
+      runPipetteInfoByMount.right.requestedPipetteMatch === INCOMPATIBLE) ||
+    // for Flex, require exact match
+    (isFlex &&
+      runPipetteInfoByMount.left != null &&
+      runPipetteInfoByMount.left.requestedPipetteMatch === INEXACT_MATCH) ||
+    (isFlex &&
+      runPipetteInfoByMount.right != null &&
+      runPipetteInfoByMount.right.requestedPipetteMatch === INEXACT_MATCH)
 
   const isFixtureMismatch = getIsFixtureMismatch(deckConfigCompatibility)
 
@@ -134,33 +150,24 @@ export function ProtocolRunSetup({
   if (robot == null) return null
 
   const liquids = protocolAnalysis?.liquids ?? []
-
   const liquidsInLoadOrder =
     protocolAnalysis != null
       ? parseLiquidsInLoadOrder(liquids, protocolAnalysis.commands)
       : []
-
   const hasLiquids = liquidsInLoadOrder.length > 0
-
   const hasModules = protocolAnalysis != null && modules.length > 0
-
   // need config compatibility (including check for single slot conflicts)
   const requiredDeckConfigCompatibility = getRequiredDeckConfig(
     deckConfigCompatibility
   )
-
   const hasFixtures = requiredDeckConfigCompatibility.length > 0
-
-  let moduleDescription: string = t(`${MODULE_SETUP_KEY}_description`, {
-    count: modules.length,
-  })
-  if (!hasModules && !isFlex) {
-    moduleDescription = i18n.format(t('no_modules_specified'), 'capitalize')
-  } else if (isFlex && (hasModules || hasFixtures)) {
-    moduleDescription = t('install_modules_and_fixtures')
-  } else if (isFlex && !hasModules && !hasFixtures) {
-    moduleDescription = t('no_modules_or_fixtures')
-  }
+  const flexDeckHardwareDescription =
+    hasModules || hasFixtures
+      ? t('install_modules_and_fixtures')
+      : t('no_deck_hardware_specified')
+  const ot2DeckHardwareDescription = hasModules
+    ? t('install_modules', { count: modules.length })
+    : t('no_deck_hardware_specified')
 
   const StepDetailMap: Record<
     StepKey,
@@ -182,7 +189,7 @@ export function ProtocolRunSetup({
           calibrationStatus={calibrationStatusRobot}
         />
       ),
-      // change description for OT-3
+      // change description for Flex
       description: isFlex
         ? t(`${ROBOT_CALIBRATION_STEP_KEY}_description_pipettes_only`)
         : t(`${ROBOT_CALIBRATION_STEP_KEY}_description`),
@@ -197,7 +204,9 @@ export function ProtocolRunSetup({
           protocolAnalysis={protocolAnalysis}
         />
       ),
-      description: moduleDescription,
+      description: isFlex
+        ? flexDeckHardwareDescription
+        : ot2DeckHardwareDescription,
     },
     [LPC_KEY]: {
       stepInternals: (
@@ -252,16 +261,12 @@ export function ProtocolRunSetup({
             <InfoMessage title={t('setup_is_view_only')} />
           ) : null}
           {analysisErrors != null && analysisErrors?.length > 0 ? (
-            <StyledText alignSelf={ALIGN_CENTER} color={COLORS.darkGreyEnabled}>
+            <StyledText alignSelf={ALIGN_CENTER} color={COLORS.grey50}>
               {t('protocol_analysis_failed')}
             </StyledText>
           ) : (
             stepsKeysInOrder.map((stepKey, index) => {
-              const setupStepTitle = t(
-                isFlex && stepKey === MODULE_SETUP_KEY
-                  ? `module_and_deck_setup`
-                  : `${stepKey}_title`
-              )
+              const setupStepTitle = t(`${stepKey}_title`)
               const showEmptySetupStep =
                 (stepKey === 'liquid_setup_step' && !hasLiquids) ||
                 (stepKey === 'module_setup_step' &&
@@ -297,6 +302,7 @@ export function ProtocolRunSetup({
                             isFlex,
                             isMissingModule,
                             isFixtureMismatch,
+                            isMissingPipette,
                           }}
                         />
                       }
@@ -313,7 +319,7 @@ export function ProtocolRunSetup({
           )}
         </>
       ) : (
-        <StyledText alignSelf={ALIGN_CENTER} color={COLORS.darkGreyEnabled}>
+        <StyledText alignSelf={ALIGN_CENTER} color={COLORS.grey50}>
           {t('loading_data')}
         </StyledText>
       )}
@@ -329,6 +335,7 @@ interface StepRightElementProps {
   isFlex: boolean
   isMissingModule: boolean
   isFixtureMismatch: boolean
+  isMissingPipette: boolean
 }
 function StepRightElement(props: StepRightElementProps): JSX.Element | null {
   const {
@@ -339,14 +346,14 @@ function StepRightElement(props: StepRightElementProps): JSX.Element | null {
     isFlex,
     isMissingModule,
     isFixtureMismatch,
+    isMissingPipette,
   } = props
   const { t } = useTranslation('protocol_setup')
   const isActionNeeded = isMissingModule || isFixtureMismatch
 
   if (
     !runHasStarted &&
-    (stepKey === ROBOT_CALIBRATION_STEP_KEY ||
-      (stepKey === MODULE_SETUP_KEY && isFlex))
+    (stepKey === ROBOT_CALIBRATION_STEP_KEY || stepKey === MODULE_SETUP_KEY)
   ) {
     const moduleAndDeckStatus = isActionNeeded
       ? { complete: false }
@@ -361,35 +368,38 @@ function StepRightElement(props: StepRightElementProps): JSX.Element | null {
       stepKey === ROBOT_CALIBRATION_STEP_KEY &&
       !calibrationStatusRobot.complete
     ) {
-      statusText = t('calibration_needed')
+      statusText = isMissingPipette
+        ? t('action_needed')
+        : t('calibration_needed')
     } else if (stepKey === MODULE_SETUP_KEY && !calibrationStatus?.complete) {
       statusText = isActionNeeded ? t('action_needed') : t('calibration_needed')
     }
 
-    return (
+    // do not render calibration ready status icon for OT-2 module setup
+    return isFlex ||
+      !(
+        stepKey === MODULE_SETUP_KEY && statusText === t('calibration_ready')
+      ) ? (
       <Flex flexDirection={DIRECTION_ROW} alignItems={ALIGN_CENTER}>
         <Icon
           size="1rem"
-          color={
-            calibrationStatus?.complete
-              ? COLORS.successEnabled
-              : COLORS.warningEnabled
-          }
+          color={calibrationStatus?.complete ? COLORS.green50 : COLORS.yellow50}
           marginRight={SPACING.spacing8}
           name={calibrationStatus?.complete ? 'ot-check' : 'alert-circle'}
           id="RunSetupCard_calibrationIcon"
         />
         <StyledText
-          color={COLORS.black}
+          color={COLORS.black90}
           css={TYPOGRAPHY.pSemiBold}
           marginRight={SPACING.spacing16}
           textTransform={TYPOGRAPHY.textTransformCapitalize}
           id="RunSetupCard_calibrationText"
+          whiteSpace="nowrap"
         >
           {statusText}
         </StyledText>
       </Flex>
-    )
+    ) : null
   } else if (stepKey === LPC_KEY) {
     return <LearnAboutLPC />
   } else {
@@ -405,7 +415,8 @@ function LearnAboutLPC(): JSX.Element {
       <Link
         css={TYPOGRAPHY.linkPSemiBold}
         marginRight={SPACING.spacing16}
-        onClick={e => {
+        whiteSpace="nowrap"
+        onClick={(e: React.MouseEvent) => {
           // clicking link shouldn't toggle step expanded state
           e.preventDefault()
           e.stopPropagation()

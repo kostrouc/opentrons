@@ -1,4 +1,6 @@
+import { beforeEach, describe, it, expect } from 'vitest'
 import { FIXED_TRASH_ID } from '../constants'
+import { fixtureTiprack300ul, getLabwareDefURI } from '@opentrons/shared-data'
 import {
   ASPIRATE_OFFSET_FROM_BOTTOM_MM,
   blowoutHelper,
@@ -23,7 +25,7 @@ import {
   blowoutInPlaceHelper,
 } from '../fixtures'
 import { distribute } from '../commandCreators/compound/distribute'
-import type { CreateCommand } from '@opentrons/shared-data'
+import type { CreateCommand, LabwareDefinition2 } from '@opentrons/shared-data'
 import type { DistributeArgs, InvariantContext, RobotState } from '../types'
 import {
   SOURCE_WELL_BLOWOUT_DESTINATION,
@@ -35,6 +37,8 @@ const airGapHelper = makeAirGapHelper({
   wellLocation: {
     origin: 'bottom',
     offset: {
+      x: 0,
+      y: 0,
       z: 11.54,
     },
   },
@@ -43,6 +47,8 @@ const dispenseAirGapHelper = makeDispenseAirGapHelper({
   wellLocation: {
     origin: 'bottom',
     offset: {
+      x: 0,
+      y: 0,
       z: 11.54,
     },
   },
@@ -68,7 +74,7 @@ beforeEach(() => {
     commandCreatorFnName: 'distribute',
     name: 'distribute test',
     description: 'test blah blah',
-
+    tipRack: getLabwareDefURI(fixtureTiprack300ul as LabwareDefinition2),
     pipette: DEFAULT_PIPETTE,
     sourceLabware: SOURCE_LABWARE,
     destLabware: DEST_LABWARE,
@@ -83,11 +89,15 @@ beforeEach(() => {
     aspirateAirGapVolume: null,
     touchTipAfterDispense: false,
     dropTipLocation: FIXED_TRASH_ID,
+    aspirateXOffset: 0,
+    dispenseXOffset: 0,
+    aspirateYOffset: 0,
+    dispenseYOffset: 0,
   }
   blowoutSingleToTrash = blowoutInPlaceHelper()
   blowoutSingleToSourceA1 = blowoutHelper(SOURCE_LABWARE, {
     wellLocation: {
-      origin: 'bottom',
+      origin: 'top',
       offset: {
         z: BLOWOUT_OFFSET_ANY,
       },
@@ -95,7 +105,7 @@ beforeEach(() => {
   })
   blowoutSingleToDestA4 = blowoutHelper(DEST_LABWARE, {
     wellLocation: {
-      origin: 'bottom',
+      origin: 'top',
       offset: {
         z: BLOWOUT_OFFSET_ANY,
       },
@@ -104,7 +114,7 @@ beforeEach(() => {
   })
   blowoutSingleToDestA3 = blowoutHelper(DEST_LABWARE, {
     wellLocation: {
-      origin: 'bottom',
+      origin: 'top',
       offset: {
         z: BLOWOUT_OFFSET_ANY,
       },
@@ -245,6 +255,7 @@ describe('tip handling for multiple distribute chunks', () => {
       destWells: ['A2', 'A3', 'A4', 'A5'],
       changeTip: 'always',
       volume: 150,
+      tipRack: getLabwareDefURI(fixtureTiprack300ul as LabwareDefinition2),
     } as DistributeArgs
 
     const result = distribute(
@@ -272,6 +283,8 @@ describe('advanced settings: volume, mix, pre-wet tip, tip touch, tip position',
         wellLocation: {
           origin: 'bottom',
           offset: {
+            x: 0,
+            y: 0,
             z: ASPIRATE_OFFSET_FROM_BOTTOM_MM,
           },
         },
@@ -307,6 +320,8 @@ describe('advanced settings: volume, mix, pre-wet tip, tip touch, tip position',
         wellLocation: {
           origin: 'bottom',
           offset: {
+            x: 0,
+            y: 0,
             z: ASPIRATE_OFFSET_FROM_BOTTOM_MM,
           },
         },
@@ -318,6 +333,8 @@ describe('advanced settings: volume, mix, pre-wet tip, tip touch, tip position',
         wellLocation: {
           origin: 'bottom',
           offset: {
+            x: 0,
+            y: 0,
             z: ASPIRATE_OFFSET_FROM_BOTTOM_MM,
           },
         },
@@ -551,6 +568,8 @@ describe('advanced settings: volume, mix, pre-wet tip, tip touch, tip position',
         wellLocation: {
           origin: 'bottom',
           offset: {
+            x: 0,
+            y: 0,
             z: ASPIRATE_OFFSET_FROM_BOTTOM_MM,
           },
         },
@@ -563,6 +582,8 @@ describe('advanced settings: volume, mix, pre-wet tip, tip touch, tip position',
         wellLocation: {
           origin: 'bottom',
           offset: {
+            x: 0,
+            y: 0,
             z: ASPIRATE_OFFSET_FROM_BOTTOM_MM,
           },
         },
@@ -688,6 +709,8 @@ describe('advanced settings: volume, mix, pre-wet tip, tip touch, tip position',
         wellLocation: {
           origin: 'bottom',
           offset: {
+            x: 0,
+            y: 0,
             z: ASPIRATE_OFFSET_FROM_BOTTOM_MM,
           },
         },
@@ -699,6 +722,8 @@ describe('advanced settings: volume, mix, pre-wet tip, tip touch, tip position',
         wellLocation: {
           origin: 'bottom',
           offset: {
+            x: 0,
+            y: 0,
             z: ASPIRATE_OFFSET_FROM_BOTTOM_MM,
           },
         },
@@ -779,6 +804,8 @@ describe('advanced settings: volume, mix, pre-wet tip, tip touch, tip position',
         wellLocation: {
           origin: 'bottom',
           offset: {
+            x: 0,
+            y: 0,
             z: ASPIRATE_OFFSET_FROM_BOTTOM_MM,
           },
         },
@@ -791,6 +818,8 @@ describe('advanced settings: volume, mix, pre-wet tip, tip touch, tip position',
         wellLocation: {
           origin: 'bottom',
           offset: {
+            x: 0,
+            y: 0,
             z: ASPIRATE_OFFSET_FROM_BOTTOM_MM,
           },
         },
@@ -877,6 +906,8 @@ describe('advanced settings: volume, mix, pre-wet tip, tip touch, tip position',
           wellLocation: {
             origin: 'bottom',
             offset: {
+              x: 0,
+              y: 0,
               z: ASPIRATE_OFFSET_FROM_BOTTOM_MM,
             },
           },

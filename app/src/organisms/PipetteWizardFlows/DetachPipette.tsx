@@ -4,19 +4,19 @@ import { css } from 'styled-components'
 import { RIGHT, WEIGHT_OF_96_CHANNEL } from '@opentrons/shared-data'
 import { useInstrumentsQuery } from '@opentrons/react-api-client'
 import {
-  Btn,
-  PrimaryButton,
-  Flex,
-  TYPOGRAPHY,
-  COLORS,
-  JUSTIFY_SPACE_BETWEEN,
-  ALIGN_FLEX_END,
   ALIGN_CENTER,
-  SPACING,
-  SIZE_1,
+  ALIGN_FLEX_END,
+  Btn,
+  COLORS,
+  Flex,
+  JUSTIFY_SPACE_BETWEEN,
+  PrimaryButton,
   RESPONSIVENESS,
+  SIZE_1,
+  SPACING,
+  StyledText,
+  TYPOGRAPHY,
 } from '@opentrons/components'
-import { StyledText } from '../../atoms/text'
 import { Banner } from '../../atoms/Banner'
 import { GenericWizardTile } from '../../molecules/GenericWizardTile'
 import { SimpleWizardBody } from '../../molecules/SimpleWizardBody'
@@ -36,7 +36,7 @@ const BACKGROUND_SIZE = '47rem'
 
 const GO_BACK_BUTTON_TEXT_STYLE = css`
   ${TYPOGRAPHY.pSemiBold};
-  color: ${COLORS.darkGreyEnabled};
+  color: ${COLORS.grey50};
 
   &:hover {
     opacity: 70%;
@@ -177,7 +177,7 @@ export const DetachPipette = (props: DetachPipetteProps): JSX.Element => {
   if (showPipetteStillAttached) {
     return (
       <SimpleWizardBody
-        iconColor={COLORS.errorEnabled}
+        iconColor={COLORS.red50}
         header={t('pipette_failed_to_detach', { pipetteName: pipetteName })}
         isSuccess={false}
       >
@@ -213,7 +213,7 @@ export const DetachPipette = (props: DetachPipetteProps): JSX.Element => {
   return errorMessage != null ? (
     <SimpleWizardBody
       isSuccess={false}
-      iconColor={COLORS.errorEnabled}
+      iconColor={COLORS.red50}
       header={t('shared:error_encountered')}
       subHeader={errorMessage}
     />

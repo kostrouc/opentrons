@@ -1,16 +1,14 @@
 // PD-specific info about labware<>module compatibilty
-import assert from 'assert'
 import {
   MAGNETIC_MODULE_TYPE,
   TEMPERATURE_MODULE_TYPE,
   THERMOCYCLER_MODULE_TYPE,
-  LabwareDefinition2,
-  ModuleType,
   HEATERSHAKER_MODULE_TYPE,
   MAGNETIC_BLOCK_TYPE,
 } from '@opentrons/shared-data'
-import { LabwareDefByDefURI } from '../labware-defs'
-import { LabwareOnDeck } from '../step-forms'
+import type { LabwareDefByDefURI } from '../labware-defs'
+import type { LabwareOnDeck } from '../step-forms'
+import type { LabwareDefinition2, ModuleType } from '@opentrons/shared-data'
 // NOTE: this does not distinguish btw versions. Standard labware only (assumes namespace is 'opentrons')
 export const COMPATIBLE_LABWARE_ALLOWLIST_BY_MODULE_TYPE: Record<
   ModuleType,
@@ -72,7 +70,7 @@ export const getLabwareIsCompatible = (
   def: LabwareDefinition2,
   moduleType: ModuleType
 ): boolean => {
-  assert(
+  console.assert(
     moduleType in COMPATIBLE_LABWARE_ALLOWLIST_BY_MODULE_TYPE,
     `expected ${moduleType} in labware<>module compatibility allowlist`
   )
@@ -114,6 +112,7 @@ export const COMPATIBLE_LABWARE_ALLOWLIST_FOR_ADAPTER: Record<
   [ALUMINUM_BLOCK_96_LOADNAME]: [
     'opentrons/biorad_96_wellplate_200ul_pcr/2',
     'opentrons/nest_96_wellplate_100ul_pcr_full_skirt/2',
+    'opentrons/opentrons_96_wellplate_200ul_pcr_full_skirt/2',
   ],
   [ALUMINUM_FLAT_BOTTOM_PLATE]: [
     'opentrons/corning_384_wellplate_112ul_flat/2',
@@ -196,8 +195,7 @@ export const getAdapterLabwareIsAMatch = (
       draggedLabwareLoadname === 'corning_96_wellplate_360ul_flat')
   const aluminumBlock96Pairs =
     loadName === ALUMINUM_BLOCK_96_LOADNAME &&
-    (draggedLabwareLoadname === 'biorad_96_wellplate_200ul_pcr' ||
-      draggedLabwareLoadname === 'nest_96_wellplate_100ul_pcr_full_skirt')
+    pcrLabwares.includes(draggedLabwareLoadname)
   const aluminumFlatBottomPlatePairs =
     loadName === ALUMINUM_FLAT_BOTTOM_PLATE &&
     flatBottomLabwares.includes(draggedLabwareLoadname)

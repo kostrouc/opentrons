@@ -1,46 +1,59 @@
 import * as React from 'react'
-
+import { when } from 'vitest-when'
 import { fireEvent, screen } from '@testing-library/react'
-import { renderWithProviders } from '@opentrons/components'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 import { i18n } from '../../../i18n'
+import { renderWithProviders } from '../../../__testing-utils__'
 import { GripperWizardFlows } from '../../../organisms/GripperWizardFlows'
 import { formatLastCalibrated } from '../CalibrationDetails/utils'
+import { useIsEstopNotDisengaged } from '../../../resources/devices/hooks/useIsEstopNotDisengaged'
 import { RobotSettingsGripperCalibration } from '../RobotSettingsGripperCalibration'
+
 import type { GripperData } from '@opentrons/api-client'
-import type { RobotSettingsGripperCalibrationProps } from '../RobotSettingsGripperCalibration'
-jest.mock('../../../organisms/GripperWizardFlows')
-jest.mock('../CalibrationDetails/utils')
 
-const mockGripperWizardFlows = GripperWizardFlows as jest.MockedFunction<
-  typeof GripperWizardFlows
->
-const mockFormatLastCalibrated = formatLastCalibrated as jest.MockedFunction<
-  typeof formatLastCalibrated
->
+vi.mock('../../../organisms/GripperWizardFlows')
+vi.mock('../CalibrationDetails/utils')
+vi.mock('../../../resources/devices/hooks/useIsEstopNotDisengaged')
 
-let props = {
-  gripper: {
-    serialNumber: 'mockSerial123',
-    data: {
-      calibratedOffset: {
-        last_modified: '12345',
-      },
+const mockGripperData = {
+  serialNumber: 'mockSerial123',
+  data: {
+    calibratedOffset: {
+      last_modified: '12345',
     },
-  } as GripperData,
-}
+  },
+} as GripperData
+const mockNotCalibratedGripper = {
+  serialNumber: 'mockSerial123',
+  data: {
+    calibratedOffset: {
+      last_modified: undefined,
+    },
+  },
+} as GripperData
+const ROBOT_NAME = 'mockRobot'
 
-const render = (props: RobotSettingsGripperCalibrationProps) => {
+const render = (
+  props: React.ComponentProps<typeof RobotSettingsGripperCalibration>
+) => {
   return renderWithProviders(<RobotSettingsGripperCalibration {...props} />, {
     i18nInstance: i18n,
   })
 }
 
 describe('RobotSettingsGripperCalibration', () => {
+  let props: React.ComponentProps<typeof RobotSettingsGripperCalibration>
   beforeEach(() => {
-    mockFormatLastCalibrated.mockReturnValue('last calibrated 1/2/3')
-    mockGripperWizardFlows.mockReturnValue(<>Mock Wizard Flow</>)
+    vi.mocked(formatLastCalibrated).mockReturnValue('last calibrated 1/2/3')
+    vi.mocked(GripperWizardFlows).mockReturnValue(<>Mock Wizard Flow</>)
+    when(useIsEstopNotDisengaged).calledWith(ROBOT_NAME).thenReturn(false)
+    props = {
+      gripper: mockGripperData,
+      robotName: ROBOT_NAME,
+    }
   })
+
   it('renders a title and description - Gripper Calibration section', () => {
     render(props)
     screen.getByText('Gripper Calibration')
@@ -61,16 +74,7 @@ describe('RobotSettingsGripperCalibration', () => {
     screen.getByText('Recalibrate gripper')
   })
   it('renders not calibrated and calibrate button if calibration data does not exist', () => {
-    props = {
-      gripper: {
-        serialNumber: 'mockSerial123',
-        data: {
-          calibratedOffset: {
-            last_modified: undefined,
-          },
-        },
-      } as GripperData,
-    }
+    props = { ...props, gripper: mockNotCalibratedGripper }
 
     render(props)
     screen.getByText('mockSerial123')
@@ -82,6 +86,7 @@ describe('RobotSettingsGripperCalibration', () => {
     screen.getByText('Calibrate gripper')
   })
   it('renders gripper wizard flows when calibrate is pressed', () => {
+    props = { ...props, gripper: mockNotCalibratedGripper }
     render(props)
     const overflowButton = screen.getByRole('button', {
       name: 'CalibrationOverflowMenu_button_gripperCalibration',
@@ -94,9 +99,20 @@ describe('RobotSettingsGripperCalibration', () => {
 
   it('render text when gripper is not attached instead calibration data', () => {
     props = {
+      ...props,
       gripper: null as any,
     }
     render(props)
     screen.getByText('No gripper attached')
+  })
+
+  it('overflow menu is disabled when e-stop button is pressed', () => {
+    when(useIsEstopNotDisengaged).calledWith(ROBOT_NAME).thenReturn(true)
+    render(props)
+    expect(
+      screen.getByRole('button', {
+        name: 'CalibrationOverflowMenu_button_gripperCalibration',
+      })
+    ).toBeDisabled()
   })
 })

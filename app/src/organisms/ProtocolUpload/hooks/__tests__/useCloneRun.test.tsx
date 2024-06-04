@@ -1,23 +1,22 @@
 import * as React from 'react'
-import { when, resetAllWhenMocks } from 'jest-when'
+import { when } from 'vitest-when'
 import { renderHook } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from 'react-query'
+import { describe, it, beforeEach, afterEach, vi, expect } from 'vitest'
+
 import {
-  useRunQuery,
   useHost,
   useCreateRunMutation,
+  useCreateProtocolAnalysisMutation,
 } from '@opentrons/react-api-client'
+
 import { useCloneRun } from '../useCloneRun'
+import { useNotifyRunQuery } from '../../../../resources/runs'
 
 import type { HostConfig } from '@opentrons/api-client'
 
-jest.mock('@opentrons/react-api-client')
-
-const mockUseHost = useHost as jest.MockedFunction<typeof useHost>
-const mockUseRunQuery = useRunQuery as jest.MockedFunction<typeof useRunQuery>
-const mockUseCreateRunMutation = useCreateRunMutation as jest.MockedFunction<
-  typeof useCreateRunMutation
->
+vi.mock('@opentrons/react-api-client')
+vi.mock('../../../../resources/runs')
 
 const HOST_CONFIG: HostConfig = { hostname: 'localhost' }
 const RUN_ID: string = 'run_id'
@@ -26,21 +25,25 @@ describe('useCloneRun hook', () => {
   let wrapper: React.FunctionComponent<{ children: React.ReactNode }>
 
   beforeEach(() => {
-    when(mockUseHost).calledWith().mockReturnValue(HOST_CONFIG)
-    when(mockUseRunQuery)
+    when(vi.mocked(useHost)).calledWith().thenReturn(HOST_CONFIG)
+    when(vi.mocked(useNotifyRunQuery))
       .calledWith(RUN_ID)
-      .mockReturnValue({
+      .thenReturn({
         data: {
           data: {
             id: RUN_ID,
             protocolId: 'protocolId',
             labwareOffsets: 'someOffset',
+            runTimeParameters: [],
           },
         },
       } as any)
-    when(mockUseCreateRunMutation)
+    when(vi.mocked(useCreateRunMutation))
       .calledWith(expect.anything())
-      .mockReturnValue({ createRun: jest.fn() } as any)
+      .thenReturn({ createRun: vi.fn() } as any)
+    vi.mocked(useCreateProtocolAnalysisMutation).mockReturnValue({
+      createProtocolAnalysis: vi.fn(),
+    } as any)
 
     const queryClient = new QueryClient()
     const clientProvider: React.FunctionComponent<{
@@ -51,12 +54,12 @@ describe('useCloneRun hook', () => {
     wrapper = clientProvider
   })
   afterEach(() => {
-    resetAllWhenMocks()
+    vi.resetAllMocks()
   })
 
   it('should return a function that when called, calls stop run with the run id', async () => {
-    const mockCreateRun = jest.fn()
-    mockUseCreateRunMutation.mockReturnValue({
+    const mockCreateRun = vi.fn()
+    vi.mocked(useCreateRunMutation).mockReturnValue({
       createRun: mockCreateRun,
     } as any)
 
@@ -65,6 +68,7 @@ describe('useCloneRun hook', () => {
     expect(mockCreateRun).toHaveBeenCalledWith({
       protocolId: 'protocolId',
       labwareOffsets: 'someOffset',
+      runTimeParameterValues: {},
     })
   })
 })

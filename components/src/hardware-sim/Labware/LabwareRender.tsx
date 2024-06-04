@@ -6,8 +6,9 @@ import {
   StrokedWells,
   StaticLabware,
 } from './labwareInternals'
-import styles from './LabwareRender.css'
+import { LabwareAdapter, labwareAdapterLoadNames } from './LabwareAdapter'
 
+import type { CSSProperties } from 'styled-components'
 import type { LabwareDefinition2 } from '@opentrons/shared-data'
 import type {
   HighlightedWellLabels,
@@ -16,7 +17,7 @@ import type {
   WellStroke,
   WellGroup,
 } from './labwareInternals/types'
-import type { CSSProperties } from 'styled-components'
+import type { LabwareAdapterLoadName } from './LabwareAdapter'
 
 export const WELL_LABEL_OPTIONS = {
   SHOW_LABEL_INSIDE: 'SHOW_LABEL_INSIDE',
@@ -28,6 +29,8 @@ export type WellLabelOption = keyof typeof WELL_LABEL_OPTIONS
 export interface LabwareRenderProps {
   /** Labware definition to render */
   definition: LabwareDefinition2
+  /** Opional Prop for labware on heater shakers sitting on right side of the deck */
+  shouldRotateAdapterOrientation?: boolean
   /** option to show well labels inside or outside of labware outline */
   wellLabelOption?: WellLabelOption
   /** wells to highlight */
@@ -52,29 +55,58 @@ export interface LabwareRenderProps {
   onMouseEnterWell?: (e: WellMouseEvent) => unknown
   /** Optional callback, called with WellMouseEvent args onMouseLeave */
   onMouseLeaveWell?: (e: WellMouseEvent) => unknown
-  /** Special class which, together with 'data-wellname' on the well elements,
-    allows drag-to-select behavior */
-  selectableWellClass?: string
   gRef?: React.RefObject<SVGGElement>
   onLabwareClick?: () => void
+  /** Hide labware outline */
+  hideOutline?: boolean
+  /** Provides well data attribute */
+  isInteractive?: boolean
 }
 
 export const LabwareRender = (props: LabwareRenderProps): JSX.Element => {
-  const { gRef } = props
-  const cornerOffsetFromSlot = props.definition.cornerOffsetFromSlot
+  const { gRef, definition, hideOutline, isInteractive } = props
+
+  const cornerOffsetFromSlot = definition.cornerOffsetFromSlot
+  const labwareLoadName = definition.parameters.loadName
+
+  if (labwareAdapterLoadNames.includes(labwareLoadName)) {
+    const { shouldRotateAdapterOrientation } = props
+    const { xDimension, yDimension } = props.definition.dimensions
+
+    return (
+      <g
+        transform={
+          shouldRotateAdapterOrientation
+            ? `rotate(180, ${xDimension / 2}, ${yDimension / 2})`
+            : 'rotate(0, 0, 0)'
+        }
+      >
+        <g
+          transform={`translate(${cornerOffsetFromSlot.x}, ${cornerOffsetFromSlot.y})`}
+          ref={gRef}
+        >
+          <LabwareAdapter
+            labwareLoadName={labwareLoadName as LabwareAdapterLoadName}
+          />
+        </g>
+      </g>
+    )
+  }
 
   return (
     <g
       transform={`translate(${cornerOffsetFromSlot.x}, ${cornerOffsetFromSlot.y})`}
       ref={gRef}
     >
+      {/* TODO(bh, 2024-05-13): refactor rendering of wells - multiple layers of styled wells, DOM ordering determines which are visible */}
       <StaticLabware
         definition={props.definition}
         onMouseEnterWell={props.onMouseEnterWell}
         onMouseLeaveWell={props.onMouseLeaveWell}
-        selectableWellClass={props.selectableWellClass}
         onLabwareClick={props.onLabwareClick}
         highlight={props.highlight}
+        hideOutline={hideOutline}
+        isInteractive={isInteractive}
       />
       {props.wellStroke != null ? (
         <StrokedWells
@@ -92,7 +124,7 @@ export const LabwareRender = (props: LabwareRenderProps): JSX.Element => {
         ? props.disabledWells.map((well, index) => (
             <StyledWells
               key={index}
-              className={styles.disabled_well}
+              wellContents="disabledWell"
               definition={props.definition}
               wells={well}
             />
@@ -100,21 +132,21 @@ export const LabwareRender = (props: LabwareRenderProps): JSX.Element => {
         : null}
       {props.highlightedWells != null ? (
         <StyledWells
-          className={styles.highlighted_well}
+          wellContents="highlightedWell"
           definition={props.definition}
           wells={props.highlightedWells}
         />
       ) : null}
       {props.selectedWells != null ? (
         <StyledWells
-          className={styles.selected_well}
+          wellContents="selectedWell"
           definition={props.definition}
           wells={props.selectedWells}
         />
       ) : null}
       {props.missingTips != null ? (
         <StyledWells
-          className={styles.missing_tip}
+          wellContents="tipMissing"
           definition={props.definition}
           wells={props.missingTips}
         />

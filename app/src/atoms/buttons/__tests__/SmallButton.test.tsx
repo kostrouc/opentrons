@@ -1,8 +1,11 @@
 import * as React from 'react'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import '@testing-library/jest-dom/vitest'
 import { fireEvent, screen } from '@testing-library/react'
-import { renderWithProviders, COLORS, BORDERS } from '@opentrons/components'
+import { COLORS, BORDERS } from '@opentrons/components'
 
 import { SmallButton } from '../SmallButton'
+import { renderWithProviders } from '../../../__testing-utils__'
 
 const render = (props: React.ComponentProps<typeof SmallButton>) => {
   return renderWithProviders(<SmallButton {...props} />)[0]
@@ -13,7 +16,7 @@ describe('SmallButton', () => {
 
   beforeEach(() => {
     props = {
-      onClick: jest.fn(),
+      onClick: vi.fn(),
       buttonText: 'small button',
     }
   })
@@ -22,10 +25,10 @@ describe('SmallButton', () => {
     fireEvent.click(screen.getByText('small button'))
     expect(props.onClick).toHaveBeenCalled()
     expect(screen.getByRole('button')).toHaveStyle(
-      `background-color: ${COLORS.blueEnabled}`
+      `background-color: ${COLORS.blue50}`
     )
     expect(screen.getByRole('button')).toHaveStyle(
-      `border-radius: ${BORDERS.borderRadiusSize4}`
+      `border-radius: ${BORDERS.borderRadius16}`
     )
   })
   it('renders the alert button', () => {
@@ -35,7 +38,7 @@ describe('SmallButton', () => {
     }
     render(props)
     expect(screen.getByRole('button')).toHaveStyle(
-      `background-color: ${COLORS.red2}`
+      `background-color: ${COLORS.red50}`
     )
   })
   it('renders the secondary button', () => {
@@ -45,7 +48,7 @@ describe('SmallButton', () => {
     }
     render(props)
     expect(screen.getByRole('button')).toHaveStyle(
-      `background-color: ${COLORS.mediumBlueEnabled}`
+      `background-color: ${COLORS.blue35}`
     )
   })
   it('renders the tertiary high light button', () => {
@@ -54,9 +57,7 @@ describe('SmallButton', () => {
       buttonType: 'tertiaryHighLight',
     }
     render(props)
-    expect(screen.getByRole('button')).toHaveStyle(
-      `color: ${COLORS.darkBlackEnabled}`
-    )
+    expect(screen.getByRole('button')).toHaveStyle(`color: ${COLORS.black90}`)
   })
   it('renders the tertiary low light', () => {
     props = {
@@ -64,9 +65,7 @@ describe('SmallButton', () => {
       buttonType: 'tertiaryLowLight',
     }
     render(props)
-    expect(screen.getByRole('button')).toHaveStyle(
-      `color: ${COLORS.darkBlackEnabled}${COLORS.opacity70HexCode}`
-    )
+    expect(screen.getByRole('button')).toHaveStyle(`color: ${COLORS.grey60}`)
   })
   it('renders the button as disabled', () => {
     props = {
@@ -83,7 +82,7 @@ describe('SmallButton', () => {
     }
     render(props)
     expect(screen.getByRole('button')).toHaveStyle(
-      `border-radius: ${BORDERS.borderRadiusSize5}`
+      `border-radius: ${BORDERS.borderRadius40}`
     )
   })
   it('renders an icon with start placement', () => {

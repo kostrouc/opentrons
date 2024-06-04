@@ -26,6 +26,11 @@ from opentrons_shared_data.errors.exceptions import (
     InvalidLiquidClassName,
     CommandPreconditionViolated,
 )
+from opentrons_shared_data.pipette.ul_per_mm import (
+    piecewise_volume_conversion,
+    PIPETTING_FUNCTION_FALLBACK_VERSION,
+    PIPETTING_FUNCTION_LATEST_VERSION,
+)
 
 
 from opentrons.types import Point, Mount
@@ -33,11 +38,7 @@ from opentrons.config import robot_configs
 from opentrons.config.types import RobotConfig
 from opentrons.drivers.types import MoveSplit
 from ..instrument_abc import AbstractInstrument
-from ..instrument_helpers import (
-    piecewise_volume_conversion,
-    PIPETTING_FUNCTION_FALLBACK_VERSION,
-    PIPETTING_FUNCTION_LATEST_VERSION,
-)
+
 from .instrument_calibration import (
     PipetteOffsetByPipetteMount,
     load_pipette_offset,
@@ -75,7 +76,9 @@ class Pipette(AbstractInstrument[PipetteConfigurations]):
     control API. Its only purpose is to gather state.
     """
 
-    DictType = Dict[str, Union[str, float, bool]]
+    DictType = Dict[
+        str, Union[str, float, bool]
+    ]  # spp: as_dict() has value items that aren't Union[str, float, bool]..
     #: The type of this data class as a dict
 
     def __init__(

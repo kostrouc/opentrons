@@ -452,13 +452,14 @@ class FailedGripperPickupError(RoboticsControlError):
 
     def __init__(
         self,
+        message: Optional[str] = None,
         details: Optional[Dict[str, Any]] = None,
         wrapping: Optional[Sequence[EnumeratedError]] = None,
     ) -> None:
         """Build a FailedGripperPickupError."""
         super().__init__(
             ErrorCodes.FAILED_GRIPPER_PICKUP_ERROR,
-            "Expected to grip labware, but none found.",
+            message or "Expected to grip labware, but none found.",
             details,
             wrapping,
         )
@@ -557,11 +558,9 @@ class UnmatchedTipPresenceStates(RoboticsControlError):
         """Build an UnmatchedTipPresenceStatesError."""
         format_tip_state = {0: "not detected", 1: "detected"}
         msg = (
-            "Received two differing tip presence statuses:"
-            "\nRear Sensor tips"
-            + format_tip_state[states[0]]
-            + "\nFront Sensor tips"
-            + format_tip_state[states[1]]
+            f"Received two differing tip presence statuses."
+            f" Rear Sensor tips: {format_tip_state[states[0]]}."
+            f" Front Sensor tips: {format_tip_state[states[1]]}."
         )
         if detail:
             msg += str(detail)
@@ -597,6 +596,37 @@ class ExecutionCancelledError(RoboticsControlError):
     ) -> None:
         """Build a ExecutionCancelledError."""
         super().__init__(ErrorCodes.EXECUTION_CANCELLED, message, detail, wrapping)
+
+
+class MotorDriverError(RoboticsControlError):
+    """An error indicating that a motor driver is in error state."""
+
+    def __init__(
+        self,
+        message: Optional[str] = None,
+        detail: Optional[Dict[str, str]] = None,
+        wrapping: Optional[Sequence[EnumeratedError]] = None,
+    ) -> None:
+        """Build a MotorDriverError."""
+        super().__init__(ErrorCodes.MOTOR_DRIVER_ERROR, message, detail, wrapping)
+
+
+class LiquidNotFoundError(RoboticsControlError):
+    """Error raised if liquid sensing move completes without detecting liquid."""
+
+    def __init__(
+        self,
+        message: Optional[str] = None,
+        detail: Optional[Dict[str, str]] = None,
+        wrapping: Optional[Sequence[EnumeratedError]] = None,
+    ) -> None:
+        """Initialize LiquidNotFoundError."""
+        super().__init__(
+            ErrorCodes.LIQUID_NOT_FOUND,
+            message,
+            detail,
+            wrapping,
+        )
 
 
 class LabwareDroppedError(RoboticsInteractionError):
@@ -677,6 +707,19 @@ class UnexpectedTipAttachError(RoboticsInteractionError):
         checked_detail["mount"] = mount
         message = f"Cannot perform {action} with a tip already attached."
         super().__init__(ErrorCodes.UNEXPECTED_TIP_ATTACH, message, detail, wrapping)
+
+
+class HepaUVFailedError(RoboticsInteractionError):
+    """An error indicating that the HEPA UV module has errored."""
+
+    def __init__(
+        self,
+        message: Optional[str] = None,
+        detail: Optional[Dict[str, str]] = None,
+        wrapping: Optional[Sequence[EnumeratedError]] = None,
+    ) -> None:
+        """Build an HepaUVFailedError."""
+        super().__init__(ErrorCodes.HEPA_UV_FAILED, message, detail, wrapping)
 
 
 class FirmwareUpdateRequiredError(RoboticsInteractionError):
@@ -930,3 +973,19 @@ class InvalidProtocolData(GeneralError):
     ) -> None:
         """Build an InvalidProtocolData."""
         super().__init__(ErrorCodes.INVALID_PROTOCOL_DATA, message, detail, wrapping)
+
+
+class InvalidStoredData(GeneralError):
+    """An error indicating that some stored data is invalid.
+
+    This will usually be because it was saved by a future version of the software.
+    """
+
+    def __init__(
+        self,
+        message: Optional[str] = None,
+        detail: Optional[Dict[str, str]] = None,
+        wrapping: Optional[Sequence[EnumeratedError]] = None,
+    ) -> None:
+        """Build an InvalidStoredData."""
+        super().__init__(ErrorCodes.INVALID_STORED_DATA, message, detail, wrapping)

@@ -1,29 +1,29 @@
 import * as React from 'react'
-import { renderWithProviders } from '@opentrons/components'
+import { vi, it, describe, expect, beforeEach } from 'vitest'
 import { StaticRouter } from 'react-router-dom'
 import { fireEvent, screen } from '@testing-library/react'
+
+import { simpleAnalysisFileFixture } from '@opentrons/api-client'
+import { OT2_ROBOT_TYPE } from '@opentrons/shared-data'
+import { renderWithProviders } from '../../../__testing-utils__'
 import { i18n } from '../../../i18n'
 import { getStoredProtocols } from '../../../redux/protocol-storage'
 import { mockConnectableRobot } from '../../../redux/discovery/__fixtures__'
-import { storedProtocolData as storedProtocolDataFixture } from '../../../redux/protocol-storage/__fixtures__'
+import {
+  storedProtocolData as storedProtocolDataFixture,
+  storedProtocolDataWithoutRunTimeParameters,
+} from '../../../redux/protocol-storage/__fixtures__'
 import { useTrackCreateProtocolRunEvent } from '../../../organisms/Devices/hooks'
 import { useCreateRunFromProtocol } from '../../ChooseRobotToRunProtocolSlideout/useCreateRunFromProtocol'
 import { ChooseProtocolSlideout } from '../'
+import { useNotifyDataReady } from '../../../resources/useNotifyDataReady'
+import type { ProtocolAnalysisOutput } from '@opentrons/shared-data'
 
-jest.mock('../../ChooseRobotToRunProtocolSlideout/useCreateRunFromProtocol')
-jest.mock('../../../redux/protocol-storage')
-jest.mock('../../../organisms/Devices/hooks')
-jest.mock('../../../redux/config')
-
-const mockGetStoredProtocols = getStoredProtocols as jest.MockedFunction<
-  typeof getStoredProtocols
->
-const mockUseCreateRunFromProtocol = useCreateRunFromProtocol as jest.MockedFunction<
-  typeof useCreateRunFromProtocol
->
-const mockUseTrackCreateProtocolRunEvent = useTrackCreateProtocolRunEvent as jest.MockedFunction<
-  typeof useTrackCreateProtocolRunEvent
->
+vi.mock('../../ChooseRobotToRunProtocolSlideout/useCreateRunFromProtocol')
+vi.mock('../../../redux/protocol-storage')
+vi.mock('../../../organisms/Devices/hooks')
+vi.mock('../../../redux/config')
+vi.mock('../../../resources/useNotifyDataReady')
 
 const render = (props: React.ComponentProps<typeof ChooseProtocolSlideout>) => {
   return renderWithProviders(
@@ -36,40 +36,53 @@ const render = (props: React.ComponentProps<typeof ChooseProtocolSlideout>) => {
   )
 }
 
+const modifiedSimpleAnalysisFileFixture = {
+  ...simpleAnalysisFileFixture,
+  robotType: OT2_ROBOT_TYPE,
+}
+const mockStoredProtocolDataFixture = [
+  {
+    ...storedProtocolDataFixture,
+    mostRecentAnalysis: ({
+      ...modifiedSimpleAnalysisFileFixture,
+      runTimeParameters: [],
+    } as any) as ProtocolAnalysisOutput,
+  },
+]
+
 describe('ChooseProtocolSlideout', () => {
-  let mockCreateRunFromProtocol: jest.Mock
-  let mockTrackCreateProtocolRunEvent: jest.Mock
+  let mockCreateRunFromProtocol = vi.fn()
+  let mockTrackCreateProtocolRunEvent = vi.fn()
   beforeEach(() => {
-    mockCreateRunFromProtocol = jest.fn()
-    mockTrackCreateProtocolRunEvent = jest.fn(
+    mockCreateRunFromProtocol = vi.fn()
+    mockTrackCreateProtocolRunEvent = vi.fn(
       () => new Promise(resolve => resolve({}))
     )
-    mockGetStoredProtocols.mockReturnValue([storedProtocolDataFixture])
-    mockUseCreateRunFromProtocol.mockReturnValue({
+    vi.mocked(getStoredProtocols).mockReturnValue(mockStoredProtocolDataFixture)
+    vi.mocked(useCreateRunFromProtocol).mockReturnValue({
       createRunFromProtocolSource: mockCreateRunFromProtocol,
-      reset: jest.fn(),
+      reset: vi.fn(),
     } as any)
-    mockUseTrackCreateProtocolRunEvent.mockReturnValue({
+    vi.mocked(useTrackCreateProtocolRunEvent).mockReturnValue({
       trackCreateProtocolRunEvent: mockTrackCreateProtocolRunEvent,
     })
-  })
-  afterEach(() => {
-    jest.resetAllMocks()
+    vi.mocked(useNotifyDataReady).mockReturnValue({} as any)
   })
 
   it('renders slideout if showSlideout true', () => {
     render({
       robot: mockConnectableRobot,
-      onCloseClick: jest.fn(),
+      onCloseClick: vi.fn(),
       showSlideout: true,
     })
     screen.getByText(/choose protocol to run/i)
     screen.getByText(/opentrons-robot-name/i)
   })
+
   it('renders an available protocol option for every stored protocol if any', () => {
     render({
       robot: mockConnectableRobot,
-      onCloseClick: jest.fn(),
+      onCloseClick: vi.fn(),
       showSlideout: true,
     })
     screen.getByLabelText('protocol deck map')
@@ -78,11 +91,12 @@ describe('ChooseProtocolSlideout', () => {
       screen.queryByRole('heading', { name: 'No protocols found' })
     ).toBeNull()
   })
+
   it('renders an empty state if no protocol options', () => {
-    mockGetStoredProtocols.mockReturnValue([])
+    vi.mocked(getStoredProtocols).mockReturnValue([])
     render({
       robot: mockConnectableRobot,
-      onCloseClick: jest.fn(),
+      onCloseClick: vi.fn(),
       showSlideout: true,
     })
     expect(screen.queryByLabelText('protocol deck map')).toBeNull()
@@ -91,10 +105,17 @@ describe('ChooseProtocolSlideout', () => {
       screen.getByRole('heading', { name: 'No protocols found' })
     ).toBeInTheDocument()
   })
+
   it('calls createRunFromProtocolSource if CTA clicked', () => {
+    const protocolDataWithoutRunTimeParameter = {
+      ...storedProtocolDataWithoutRunTimeParameters,
+    }
+    vi.mocked(getStoredProtocols).mockReturnValue([
+      protocolDataWithoutRunTimeParameter,
+    ])
     render({
       robot: mockConnectableRobot,
-      onCloseClick: jest.fn(),
+      onCloseClick: vi.fn(),
       showSlideout: true,
     })
     const proceedButton = screen.getByRole('button', {
@@ -107,17 +128,63 @@ describe('ChooseProtocolSlideout', () => {
     })
     expect(mockTrackCreateProtocolRunEvent).toHaveBeenCalled()
   })
+
+  it('move to the second slideout if CTA clicked', () => {
+    const protocolDataWithoutRunTimeParameter = {
+      ...storedProtocolDataFixture,
+    }
+    vi.mocked(getStoredProtocols).mockReturnValue([
+      protocolDataWithoutRunTimeParameter,
+    ])
+    render({
+      robot: mockConnectableRobot,
+      onCloseClick: vi.fn(),
+      showSlideout: true,
+    })
+    const proceedButton = screen.getByRole('button', {
+      name: 'Continue to parameters',
+    })
+    fireEvent.click(proceedButton)
+    screen.getByText('Step 2 / 2')
+    screen.getByText('number of samples')
+    screen.getByText('Restore default values')
+  })
+
+  it('shows tooltip when disabled Restore default values link is clicked', () => {
+    const protocolDataWithoutRunTimeParameter = {
+      ...storedProtocolDataFixture,
+    }
+    vi.mocked(getStoredProtocols).mockReturnValue([
+      protocolDataWithoutRunTimeParameter,
+    ])
+
+    render({
+      robot: mockConnectableRobot,
+      onCloseClick: vi.fn(),
+      showSlideout: true,
+    })
+    const proceedButton = screen.getByRole('button', {
+      name: 'Continue to parameters',
+    })
+    fireEvent.click(proceedButton)
+    const restoreValuesLink = screen.getByText('Restore default values')
+    fireEvent.click(restoreValuesLink)
+    screen.getByText('No custom values specified')
+  })
+
+  // ToDo (kk:04/18/2024) I will update test for RTP
+  /*
   it('renders error state when there is a run creation error', () => {
-    mockUseCreateRunFromProtocol.mockReturnValue({
+    vi.mocked(useCreateRunFromProtocol).mockReturnValue({
       runCreationError: 'run creation error',
       createRunFromProtocolSource: mockCreateRunFromProtocol,
       isCreatingRun: false,
-      reset: jest.fn(),
+      reset: vi.fn(),
       runCreationErrorCode: 500,
     })
     render({
       robot: mockConnectableRobot,
-      onCloseClick: jest.fn(),
+      onCloseClick: vi.fn(),
       showSlideout: true,
     })
     const proceedButton = screen.getByRole('button', {
@@ -133,16 +200,16 @@ describe('ChooseProtocolSlideout', () => {
   })
 
   it('renders error state when run creation error code is 409', () => {
-    mockUseCreateRunFromProtocol.mockReturnValue({
+    vi.mocked(useCreateRunFromProtocol).mockReturnValue({
       runCreationError: 'Current run is not idle or stopped.',
       createRunFromProtocolSource: mockCreateRunFromProtocol,
       isCreatingRun: false,
-      reset: jest.fn(),
+      reset: vi.fn(),
       runCreationErrorCode: 409,
     })
     render({
       robot: mockConnectableRobot,
-      onCloseClick: jest.fn(),
+      onCloseClick: vi.fn(),
       showSlideout: true,
     })
     const proceedButton = screen.getByRole('button', {
@@ -161,4 +228,5 @@ describe('ChooseProtocolSlideout', () => {
     fireEvent.click(link)
     expect(link.getAttribute('href')).toEqual('/devices/opentrons-robot-name')
   })
+  */
 })

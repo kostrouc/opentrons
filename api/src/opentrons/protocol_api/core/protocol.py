@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import abstractmethod, ABC
 from typing import Generic, List, Optional, Union, Tuple, Dict, TYPE_CHECKING
 
-from opentrons_shared_data.deck.dev_types import DeckDefinitionV4, SlotDefV3
+from opentrons_shared_data.deck.dev_types import DeckDefinitionV5, SlotDefV3
 from opentrons_shared_data.pipette.dev_types import PipetteNameType
 from opentrons_shared_data.labware.dev_types import LabwareDefinition
 from opentrons_shared_data.robot.dev_types import RobotType
@@ -19,9 +19,8 @@ from .instrument import InstrumentCoreType
 from .labware import LabwareCoreType, LabwareLoadParams
 from .module import ModuleCoreType
 from .._liquid import Liquid
-from .._trash_bin import TrashBin
-from .._waste_chute import WasteChute
 from .._types import OffDeckType
+from ..disposal_locations import TrashBin, WasteChute
 
 if TYPE_CHECKING:
     from ..labware import Labware
@@ -63,7 +62,8 @@ class AbstractProtocol(
 
     @abstractmethod
     def append_disposal_location(
-        self, disposal_location: Union[Labware, TrashBin, WasteChute]
+        self,
+        disposal_location: Union[Labware, TrashBin, WasteChute],
     ) -> None:
         """Append a disposal location object to the core"""
         ...
@@ -129,6 +129,18 @@ class AbstractProtocol(
         ...
 
     @abstractmethod
+    def load_trash_bin(self, slot_name: DeckSlotName, area_name: str) -> TrashBin:
+        ...
+
+    @abstractmethod
+    def load_ot2_fixed_trash_bin(self) -> None:
+        ...
+
+    @abstractmethod
+    def load_waste_chute(self) -> WasteChute:
+        ...
+
+    @abstractmethod
     def pause(self, msg: Optional[str]) -> None:
         ...
 
@@ -176,7 +188,7 @@ class AbstractProtocol(
         ...
 
     @abstractmethod
-    def get_deck_definition(self) -> DeckDefinitionV4:
+    def get_deck_definition(self) -> DeckDefinitionV5:
         """Get the geometry definition of the robot's deck."""
 
     @abstractmethod

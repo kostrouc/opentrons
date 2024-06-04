@@ -1,32 +1,54 @@
 import * as React from 'react'
 import { fireEvent, screen } from '@testing-library/react'
-import { when, resetAllWhenMocks } from 'jest-when'
+import { when } from 'vitest-when'
+import { describe, it, beforeEach, vi, afterEach } from 'vitest'
 
+import { TRASH_BIN_ADAPTER_FIXTURE } from '@opentrons/shared-data'
+import { DeckConfigurator } from '@opentrons/components'
 import {
-  DeckConfigurator,
-  partialComponentPropsMatcher,
-  renderWithProviders,
-} from '@opentrons/components'
-import {
-  useCurrentMaintenanceRun,
-  useDeckConfigurationQuery,
+  useModulesQuery,
   useUpdateDeckConfigurationMutation,
 } from '@opentrons/react-api-client'
 
+import { renderWithProviders } from '../../../__testing-utils__'
 import { i18n } from '../../../i18n'
-import { useRunStatuses } from '../../Devices/hooks'
+import { useIsRobotViewable, useRunStatuses } from '../../Devices/hooks'
 import { DeckFixtureSetupInstructionsModal } from '../DeckFixtureSetupInstructionsModal'
+import { useIsEstopNotDisengaged } from '../../../resources/devices/hooks/useIsEstopNotDisengaged'
 import { DeviceDetailsDeckConfiguration } from '../'
+import { useNotifyCurrentMaintenanceRun } from '../../../resources/maintenance_runs'
+import {
+  useDeckConfigurationEditingTools,
+  useNotifyDeckConfigurationQuery,
+} from '../../../resources/deck_configuration'
 
+import type { UseQueryResult } from 'react-query'
 import type { MaintenanceRun } from '@opentrons/api-client'
+import type { DeckConfiguration } from '@opentrons/shared-data'
+import type * as OpentronsComponents from '@opentrons/components'
 
-jest.mock('@opentrons/components/src/hardware-sim/DeckConfigurator/index')
-jest.mock('@opentrons/react-api-client')
-jest.mock('../DeckFixtureSetupInstructionsModal')
-jest.mock('../../Devices/hooks')
+vi.mock('@opentrons/components', async importOriginal => {
+  const actual = await importOriginal<typeof OpentronsComponents>()
+  return {
+    ...actual,
+    DeckConfigurator: vi.fn(),
+  }
+})
+vi.mock('@opentrons/react-api-client')
+vi.mock('../DeckFixtureSetupInstructionsModal')
+vi.mock('../../Devices/hooks')
+vi.mock('../../../resources/maintenance_runs')
+vi.mock('../../../resources/devices/hooks/useIsEstopNotDisengaged')
+vi.mock('../../../resources/deck_configuration')
 
+const mockDeckConfig = [
+  {
+    cutoutId: 'cutoutC3',
+    cutoutFixtureId: TRASH_BIN_ADAPTER_FIXTURE,
+  },
+]
 const ROBOT_NAME = 'otie'
-const mockUpdateDeckConfiguration = jest.fn()
+const mockUpdateDeckConfiguration = vi.fn()
 const RUN_STATUSES = {
   isRunRunning: false,
   isRunStill: false,
@@ -36,25 +58,6 @@ const RUN_STATUSES = {
 const mockCurrnetMaintenanceRun = {
   data: { id: 'mockMaintenanceRunId' },
 } as MaintenanceRun
-
-const mockUseDeckConfigurationQuery = useDeckConfigurationQuery as jest.MockedFunction<
-  typeof useDeckConfigurationQuery
->
-const mockUseUpdateDeckConfigurationMutation = useUpdateDeckConfigurationMutation as jest.MockedFunction<
-  typeof useUpdateDeckConfigurationMutation
->
-const mockDeckFixtureSetupInstructionsModal = DeckFixtureSetupInstructionsModal as jest.MockedFunction<
-  typeof DeckFixtureSetupInstructionsModal
->
-const mockDeckConfigurator = DeckConfigurator as jest.MockedFunction<
-  typeof DeckConfigurator
->
-const mockUseRunStatuses = useRunStatuses as jest.MockedFunction<
-  typeof useRunStatuses
->
-const mockUseCurrentMaintenanceRun = useCurrentMaintenanceRun as jest.MockedFunction<
-  typeof useCurrentMaintenanceRun
->
 
 const render = (
   props: React.ComponentProps<typeof DeviceDetailsDeckConfiguration>
@@ -71,22 +74,36 @@ describe('DeviceDetailsDeckConfiguration', () => {
     props = {
       robotName: ROBOT_NAME,
     }
-    mockUseDeckConfigurationQuery.mockReturnValue({ data: [] } as any)
-    mockUseUpdateDeckConfigurationMutation.mockReturnValue({
+    vi.mocked(useModulesQuery).mockReturnValue({ data: { data: [] } } as any)
+    vi.mocked(useUpdateDeckConfigurationMutation).mockReturnValue({
       updateDeckConfiguration: mockUpdateDeckConfiguration,
     } as any)
-    mockDeckFixtureSetupInstructionsModal.mockReturnValue(
+    vi.mocked(DeckFixtureSetupInstructionsModal).mockReturnValue(
       <div>mock DeckFixtureSetupInstructionsModal</div>
     )
-    when(mockDeckConfigurator).mockReturnValue(<div>mock DeckConfigurator</div>)
-    mockUseRunStatuses.mockReturnValue(RUN_STATUSES)
-    mockUseCurrentMaintenanceRun.mockReturnValue({
+    vi.mocked(DeckConfigurator).mockReturnValue(
+      <div>mock DeckConfigurator</div>
+    )
+    vi.mocked(useRunStatuses).mockReturnValue(RUN_STATUSES)
+    vi.mocked(useNotifyCurrentMaintenanceRun).mockReturnValue({
       data: {},
     } as any)
+    when(vi.mocked(useIsEstopNotDisengaged))
+      .calledWith(ROBOT_NAME)
+      .thenReturn(false)
+    when(vi.mocked(useIsRobotViewable)).calledWith(ROBOT_NAME).thenReturn(true)
+    vi.mocked(useNotifyDeckConfigurationQuery).mockReturnValue({
+      data: mockDeckConfig,
+    } as UseQueryResult<DeckConfiguration>)
+    vi.mocked(useDeckConfigurationEditingTools).mockReturnValue({
+      addFixtureToCutout: vi.fn(),
+      removeFixtureFromCutout: vi.fn(),
+      addFixtureModal: null,
+    })
   })
 
   afterEach(() => {
-    resetAllWhenMocks()
+    vi.resetAllMocks()
   })
 
   it('should render text and button', () => {
@@ -94,7 +111,7 @@ describe('DeviceDetailsDeckConfiguration', () => {
     screen.getByText('otie deck configuration')
     screen.getByRole('button', { name: 'Setup Instructions' })
     screen.getByText('Location')
-    screen.getByText('Fixture')
+    screen.getByText('Deck hardware')
     screen.getByText('mock DeckConfigurator')
   })
 
@@ -106,10 +123,10 @@ describe('DeviceDetailsDeckConfiguration', () => {
 
   it('should render banner and make deck configurator disabled when running', () => {
     RUN_STATUSES.isRunRunning = true
-    mockUseRunStatuses.mockReturnValue(RUN_STATUSES)
-    when(mockDeckConfigurator)
-      .calledWith(partialComponentPropsMatcher({ readOnly: true }))
-      .mockReturnValue(<div>disabled mock DeckConfigurator</div>)
+    vi.mocked(useRunStatuses).mockReturnValue(RUN_STATUSES)
+    vi.mocked(DeckConfigurator).mockReturnValue(
+      <div>disabled mock DeckConfigurator</div>
+    )
     render(props)
     screen.getByText(
       'Deck configuration is not available when run is in progress'
@@ -118,12 +135,12 @@ describe('DeviceDetailsDeckConfiguration', () => {
   })
 
   it('should render banner and make deck configurator disabled when a maintenance run exists', () => {
-    mockUseCurrentMaintenanceRun.mockReturnValue({
+    vi.mocked(useNotifyCurrentMaintenanceRun).mockReturnValue({
       data: mockCurrnetMaintenanceRun,
     } as any)
-    when(mockDeckConfigurator)
-      .calledWith(partialComponentPropsMatcher({ readOnly: true }))
-      .mockReturnValue(<div>disabled mock DeckConfigurator</div>)
+    vi.mocked(DeckConfigurator).mockReturnValue(
+      <div>disabled mock DeckConfigurator</div>
+    )
     render(props)
     screen.getByText(
       'Deck configuration is not available when the robot is busy'
@@ -132,10 +149,27 @@ describe('DeviceDetailsDeckConfiguration', () => {
   })
 
   it('should render no deck fixtures, if deck configs are not set', () => {
-    when(mockUseDeckConfigurationQuery)
-      .calledWith()
-      .mockReturnValue([] as any)
+    vi.mocked(useNotifyDeckConfigurationQuery).mockReturnValue({
+      data: [],
+    } as any)
     render(props)
     screen.getByText('No deck fixtures')
+  })
+
+  it('should render disabled deck configurator when e-stop is pressed', () => {
+    when(vi.mocked(useIsEstopNotDisengaged))
+      .calledWith(ROBOT_NAME)
+      .thenReturn(true)
+    vi.mocked(DeckConfigurator).mockReturnValue(
+      <div>disabled mock DeckConfigurator</div>
+    )
+    render(props)
+    screen.getByText('disabled mock DeckConfigurator')
+  })
+
+  it('should render not viewable text when robot is not viewable', () => {
+    when(vi.mocked(useIsRobotViewable)).calledWith(ROBOT_NAME).thenReturn(false)
+    render(props)
+    screen.getByText('Robot must be on the network to see deck configuration')
   })
 })

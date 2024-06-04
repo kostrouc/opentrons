@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest'
 import {
   parsePipetteEntity,
   parseInitialPipetteNamesByMount,
@@ -13,7 +14,7 @@ import {
 } from '../utils'
 import { simpleAnalysisFileFixture } from '../__fixtures__'
 
-import { RunTimeCommand } from '@opentrons/shared-data'
+import type { RunTimeCommand } from '@opentrons/shared-data'
 
 const mockRunTimeCommands: RunTimeCommand[] = simpleAnalysisFileFixture.commands as any
 const mockLoadLiquidRunTimeCommands = [

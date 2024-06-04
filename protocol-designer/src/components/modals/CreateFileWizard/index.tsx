@@ -1,37 +1,25 @@
 import * as React from 'react'
+import { useTranslation } from 'react-i18next'
 import { useDispatch, useSelector } from 'react-redux'
 import reduce from 'lodash/reduce'
 import mapValues from 'lodash/mapValues'
+import { useForm } from 'react-hook-form'
+import { yupResolver } from '@hookform/resolvers/yup'
 import omit from 'lodash/omit'
 import uniq from 'lodash/uniq'
-import { Formik, FormikProps } from 'formik'
 import * as Yup from 'yup'
 import { ModalShell } from '@opentrons/components'
 import {
-  ModuleType,
-  ModuleModel,
-  PipetteName,
   OT2_ROBOT_TYPE,
-  MAGNETIC_BLOCK_TYPE,
   TEMPERATURE_MODULE_TYPE,
-  MAGNETIC_BLOCK_V1,
   HEATERSHAKER_MODULE_TYPE,
-  HEATERSHAKER_MODULE_V1,
   MAGNETIC_MODULE_TYPE,
   THERMOCYCLER_MODULE_TYPE,
-  SPAN7_8_10_11_SLOT,
   FLEX_ROBOT_TYPE,
-  MAGNETIC_MODULE_V2,
-  THERMOCYCLER_MODULE_V2,
-  TEMPERATURE_MODULE_V2,
   WASTE_CHUTE_CUTOUT,
+  getAreSlotsAdjacent,
 } from '@opentrons/shared-data'
-import {
-  actions as stepFormActions,
-  FormPipettesByMount,
-  FormPipette,
-  PipetteOnDeck,
-} from '../../../step-forms'
+import { actions as stepFormActions } from '../../../step-forms'
 import { INITIAL_DECK_SETUP_STEP_ID } from '../../../constants'
 import { uuid } from '../../../utils'
 import { actions as navigationActions } from '../../../navigation'
@@ -48,6 +36,7 @@ import {
   createDeckFixture,
   toggleIsGripperRequired,
 } from '../../../step-forms/actions/additionalItems'
+import { createModuleWithNoSlot } from '../../../modules'
 import { RobotTypeTile } from './RobotTypeTile'
 import { MetadataTile } from './MetadataTile'
 import { FirstPipetteTypeTile, SecondPipetteTypeTile } from './PipetteTypeTile'
@@ -57,11 +46,20 @@ import { WizardHeader } from './WizardHeader'
 import { StagingAreaTile } from './StagingAreaTile'
 import { getTrashSlot } from './utils'
 
+import type {
+  ModuleType,
+  ModuleModel,
+  PipetteName,
+} from '@opentrons/shared-data'
 import type { NormalizedPipette } from '@opentrons/step-generation'
+import type { ThunkDispatch } from 'redux-thunk'
+import type {
+  FormPipettesByMount,
+  FormPipette,
+  PipetteOnDeck,
+} from '../../../step-forms'
+import type { BaseState } from '../../../types'
 import type { FormState } from './types'
-import { i18n } from '../../../localization'
-import { ThunkDispatch } from 'redux-thunk'
-import { BaseState } from '../../../types'
 
 type WizardStep =
   | 'robotType'
@@ -95,6 +93,7 @@ export const adapter96ChannelDefUri =
   'opentrons/opentrons_flex_96_tiprack_adapter/1'
 
 export function CreateFileWizard(): JSX.Element | null {
+  const { t } = useTranslation(['modal', 'alert'])
   const showWizard = useSelector(getNewProtocolModal)
   const hasUnsavedChanges = useSelector(loadFileSelectors.getHasUnsavedChanges)
   const customLabware = useSelector(
@@ -122,6 +121,7 @@ export function CreateFileWizard(): JSX.Element | null {
       values.pipettesByMount,
       (acc, formPipette: FormPipette, mount): PipetteFieldsData[] => {
         return formPipette?.pipetteName != null &&
+          formPipette?.pipetteName !== '' &&
           formPipette.tiprackDefURI != null &&
           (mount === 'left' || mount === 'right')
           ? [
@@ -137,20 +137,22 @@ export function CreateFileWizard(): JSX.Element | null {
       []
     )
 
-    const modules: ModuleCreationArgs[] = Object.entries(
-      values.modulesByType
-    ).reduce<ModuleCreationArgs[]>((acc, [moduleType, formModule]) => {
-      return formModule?.onDeck
-        ? [
-            ...acc,
-            {
-              type: moduleType as ModuleType,
-              model: formModule.model || ('' as ModuleModel),
-              slot: formModule.slot,
+    const modules: ModuleCreationArgs[] =
+      values.modules != null
+        ? Object.entries(values.modules).reduce<ModuleCreationArgs[]>(
+            (acc, [number, formModule]) => {
+              return [
+                ...acc,
+                {
+                  type: formModule.type,
+                  model: formModule.model || ('' as ModuleModel),
+                  slot: formModule.slot,
+                },
+              ]
             },
-          ]
-        : acc
-    }, [])
+            []
+          )
+        : []
     const heaterShakerIndex = modules.findIndex(
       mod => mod.type === HEATERSHAKER_MODULE_TYPE
     )
@@ -163,10 +165,7 @@ export function CreateFileWizard(): JSX.Element | null {
     }
     const newProtocolFields = values.fields
 
-    if (
-      !hasUnsavedChanges ||
-      window.confirm(i18n.t('alert.window.confirm_create_new'))
-    ) {
+    if (!hasUnsavedChanges || window.confirm(t('alert:confirm_create_new'))) {
       dispatch(fileActions.createNewProtocol(newProtocolFields))
       const pipettesById: Record<string, PipetteOnDeck> = pipettes.reduce(
         (acc, pipette) => ({ ...acc, [uuid()]: pipette }),
@@ -235,26 +234,57 @@ export function CreateFileWizard(): JSX.Element | null {
       }
 
       // create modules
-      modules.forEach(moduleArgs =>
-        dispatch(stepFormActions.createModule(moduleArgs))
-      )
+      // sort so modules with slot are created first
+      // then modules without a slot are generated in remaining available slots
+      modules.sort((a, b) => {
+        if (a.slot == null && b.slot != null) {
+          return 1
+        }
+        if (b.slot == null && a.slot != null) {
+          return -1
+        }
+        return 0
+      })
+
+      modules.forEach(moduleArgs => {
+        return moduleArgs.slot != null
+          ? dispatch(stepFormActions.createModule(moduleArgs))
+          : dispatch(
+              createModuleWithNoSlot({
+                model: moduleArgs.model,
+                type: moduleArgs.type,
+              })
+            )
+      })
+
       // add gripper
       if (values.additionalEquipment.includes('gripper')) {
         dispatch(toggleIsGripperRequired())
       }
       // auto-generate tipracks for pipettes
       const newTiprackModels: string[] = uniq(
-        pipettes.map(pipette => pipette.tiprackDefURI)
+        pipettes.flatMap(pipette => pipette.tiprackDefURI)
+      )
+      const FLEX_MIDDLE_SLOTS = ['C2', 'B2', 'A2']
+      const hasOt2TC = modules.find(
+        module => module.type === THERMOCYCLER_MODULE_TYPE
+      )
+      const heaterShakerSlot = modules.find(
+        module => module.type === HEATERSHAKER_MODULE_TYPE
+      )?.slot
+      const OT2_MIDDLE_SLOTS = hasOt2TC ? ['2', '5'] : ['2', '5', '8', '11']
+      const modifiedOt2Slots = OT2_MIDDLE_SLOTS.filter(slot =>
+        heaterShakerSlot != null
+          ? !getAreSlotsAdjacent(heaterShakerSlot, slot)
+          : slot
       )
       newTiprackModels.forEach((tiprackDefURI, index) => {
-        const ot2Slots = index === 0 ? '2' : '5'
-        const flexSlots = index === 0 ? 'C2' : 'B2'
         dispatch(
           labwareIngredActions.createContainer({
             slot:
               values.fields.robotType === FLEX_ROBOT_TYPE
-                ? flexSlots
-                : ot2Slots,
+                ? FLEX_MIDDLE_SLOTS[index]
+                : modifiedOt2Slots[index],
             labwareDefURI: tiprackDefURI,
             adapterUnderLabwareDefURI:
               values.pipettesByMount.left.pipetteName === 'p1000_96'
@@ -267,7 +297,7 @@ export function CreateFileWizard(): JSX.Element | null {
   }
   const wizardHeader = (
     <WizardHeader
-      title={i18n.t('modal.create_file_wizard.create_new_protocol')}
+      title={t('create_new_protocol')}
       currentStep={currentStepIndex}
       totalSteps={wizardSteps.length - 1}
       onExit={handleCancel}
@@ -320,33 +350,7 @@ const initialFormState: FormState = {
     left: { pipetteName: undefined, tiprackDefURI: undefined },
     right: { pipetteName: undefined, tiprackDefURI: undefined },
   },
-  modulesByType: {
-    [MAGNETIC_BLOCK_TYPE]: {
-      onDeck: false,
-      model: MAGNETIC_BLOCK_V1,
-      slot: '2',
-    },
-    [HEATERSHAKER_MODULE_TYPE]: {
-      onDeck: false,
-      model: HEATERSHAKER_MODULE_V1,
-      slot: '1',
-    },
-    [MAGNETIC_MODULE_TYPE]: {
-      onDeck: false,
-      model: MAGNETIC_MODULE_V2,
-      slot: '1',
-    },
-    [TEMPERATURE_MODULE_TYPE]: {
-      onDeck: false,
-      model: TEMPERATURE_MODULE_V2,
-      slot: '3',
-    },
-    [THERMOCYCLER_MODULE_TYPE]: {
-      onDeck: false,
-      model: THERMOCYCLER_MODULE_V2,
-      slot: SPAN7_8_10_11_SLOT,
-    },
-  },
+  modules: {},
   //  defaulting to selecting trashBin already to avoid user having to
   //  click to add a trash bin/waste chute. Delete once we support returnTip()
   additionalEquipment: ['trashBin'],
@@ -354,28 +358,23 @@ const initialFormState: FormState = {
 
 const pipetteValidationShape = Yup.object().shape({
   pipetteName: Yup.string().nullable(),
-  tiprackDefURI: Yup.string()
+  tiprackDefURI: Yup.array()
+    .of(Yup.string())
     .nullable()
     .when('pipetteName', {
       is: (val: string | null): boolean => Boolean(val),
-      then: Yup.string().required('Required'),
-      otherwise: null,
+      then: schema => schema.required('Required'),
+      otherwise: schema => schema.nullable(),
     }),
 })
 // any typing this because TS says there are too many possibilities of what this could be
 const moduleValidationShape: any = Yup.object().shape({
-  onDeck: Yup.boolean().default(false),
-  model: Yup.string()
-    .nullable()
-    .when('onDeck', {
-      is: true,
-      then: Yup.string().required('Required'),
-      otherwise: null,
-    }),
+  type: Yup.string(),
+  model: Yup.string(),
   slot: Yup.string(),
 })
 
-const validationSchema = Yup.object().shape({
+const validationSchema: any = Yup.object().shape({
   fields: Yup.object().shape({
     name: Yup.string().required('Required'),
   }),
@@ -411,6 +410,10 @@ function CreateFileForm(props: CreateFileFormProps): JSX.Element {
     goBack,
     setWizardSteps,
   } = props
+  const { ...formProps } = useForm<FormState>({
+    defaultValues: initialFormState,
+    resolver: yupResolver(validationSchema),
+  })
 
   const handleProceedRobotType = (robotType: string): void => {
     if (robotType === OT2_ROBOT_TYPE) {
@@ -420,71 +423,55 @@ function CreateFileForm(props: CreateFileFormProps): JSX.Element {
     }
   }
 
-  const contentsByWizardStep: {
-    [wizardStep in WizardStep]: (
-      formikProps: FormikProps<FormState>
-    ) => JSX.Element
-  } = {
-    robotType: (formikProps: FormikProps<FormState>) => (
-      <RobotTypeTile
-        {...formikProps}
-        goBack={goBack}
-        proceed={() => {
-          handleProceedRobotType(formikProps.values.fields.robotType)
-          proceed()
-        }}
-      />
-    ),
-    metadata: (formikProps: FormikProps<FormState>) => (
-      <MetadataTile {...formikProps} proceed={proceed} goBack={goBack} />
-    ),
-    first_pipette_type: (formikProps: FormikProps<FormState>) => (
-      <FirstPipetteTypeTile {...{ ...formikProps, proceed, goBack }} />
-    ),
-    first_pipette_tips: (formikProps: FormikProps<FormState>) => (
-      <FirstPipetteTipsTile {...{ ...formikProps, proceed, goBack }} />
-    ),
-    second_pipette_type: (formikProps: FormikProps<FormState>) => (
-      <SecondPipetteTypeTile {...{ ...formikProps, proceed, goBack }} />
-    ),
-    second_pipette_tips: (formikProps: FormikProps<FormState>) => (
-      <SecondPipetteTipsTile {...{ ...formikProps, proceed, goBack }} />
-    ),
-    staging_area: (formikProps: FormikProps<FormState>) => (
-      <StagingAreaTile {...{ ...formikProps, proceed, goBack }} />
-    ),
-    modulesAndOther: (formikProps: FormikProps<FormState>) => (
-      <ModulesAndOtherTile
-        {...formikProps}
-        proceed={() => createProtocolFile(formikProps.values)}
-        goBack={goBack}
-      />
-    ),
-  }
-
   return (
-    <Formik
-      enableReinitialize
-      initialValues={initialFormState}
-      onSubmit={() => {}}
-      validationSchema={validationSchema}
-    >
-      {(formikProps: FormikProps<FormState>) => {
-        const handleChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
-          const { name, value } = e.target
-          formikProps.setFieldValue(name, value)
-          formikProps.setFieldTouched(name, true)
+    <form onSubmit={formProps.handleSubmit(() => {})}>
+      {(() => {
+        switch (currentWizardStep) {
+          case 'robotType':
+            return (
+              <RobotTypeTile
+                {...formProps}
+                goBack={goBack}
+                proceed={() => {
+                  handleProceedRobotType(formProps.getValues().fields.robotType)
+                  proceed()
+                }}
+              />
+            )
+          case 'metadata':
+            return (
+              <MetadataTile {...formProps} proceed={proceed} goBack={goBack} />
+            )
+          case 'first_pipette_type':
+            return (
+              <FirstPipetteTypeTile {...{ ...formProps, proceed, goBack }} />
+            )
+          case 'first_pipette_tips':
+            return (
+              <FirstPipetteTipsTile {...{ ...formProps, proceed, goBack }} />
+            )
+          case 'second_pipette_type':
+            return (
+              <SecondPipetteTypeTile {...{ ...formProps, proceed, goBack }} />
+            )
+          case 'second_pipette_tips':
+            return (
+              <SecondPipetteTipsTile {...{ ...formProps, proceed, goBack }} />
+            )
+          case 'staging_area':
+            return <StagingAreaTile {...{ ...formProps, proceed, goBack }} />
+          case 'modulesAndOther':
+            return (
+              <ModulesAndOtherTile
+                {...formProps}
+                proceed={() => createProtocolFile(formProps.getValues())}
+                goBack={goBack}
+              />
+            )
+          default:
+            return null
         }
-
-        return currentWizardStep === 'metadata'
-          ? contentsByWizardStep.metadata({
-              ...formikProps,
-              handleChange,
-            })
-          : contentsByWizardStep[currentWizardStep]({
-              ...formikProps,
-            })
-      }}
-    </Formik>
+      })()}
+    </form>
   )
 }

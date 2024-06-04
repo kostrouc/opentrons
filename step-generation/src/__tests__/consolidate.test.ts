@@ -1,3 +1,5 @@
+import { beforeEach, describe, it, expect } from 'vitest'
+import { getLabwareDefURI, fixtureTiprack300ul } from '@opentrons/shared-data'
 import { consolidate } from '../commandCreators/compound/consolidate'
 import { FIXED_TRASH_ID } from '../constants'
 import {
@@ -24,7 +26,11 @@ import {
   blowoutInPlaceHelper,
 } from '../fixtures'
 import { DEST_WELL_BLOWOUT_DESTINATION } from '../utils'
-import type { AspDispAirgapParams, CreateCommand } from '@opentrons/shared-data'
+import type {
+  AspDispAirgapParams,
+  CreateCommand,
+  LabwareDefinition2,
+} from '@opentrons/shared-data'
 import type { ConsolidateArgs, InvariantContext, RobotState } from '../types'
 
 const airGapHelper = makeAirGapHelper({
@@ -32,6 +38,8 @@ const airGapHelper = makeAirGapHelper({
     origin: 'bottom',
     offset: {
       z: 11.54,
+      x: 0,
+      y: 0,
     },
   },
 })
@@ -96,6 +104,11 @@ beforeEach(() => {
     mixInDestination: null,
     blowoutLocation: null,
     dropTipLocation: FIXED_TRASH_ID,
+    tipRack: getLabwareDefURI(fixtureTiprack300ul as LabwareDefinition2),
+    aspirateXOffset: 0,
+    dispenseXOffset: 0,
+    aspirateYOffset: 0,
+    dispenseYOffset: 0,
   }
 })
 
@@ -257,6 +270,8 @@ describe('consolidate single-channel', () => {
         wellLocation: {
           origin: 'bottom',
           offset: {
+            x: 0,
+            y: 0,
             z: ASPIRATE_OFFSET_FROM_BOTTOM_MM,
           },
         },
@@ -272,6 +287,8 @@ describe('consolidate single-channel', () => {
         wellLocation: {
           origin: 'bottom',
           offset: {
+            x: 0,
+            y: 0,
             z: ASPIRATE_OFFSET_FROM_BOTTOM_MM,
           },
         },
@@ -305,6 +322,8 @@ describe('consolidate single-channel', () => {
           wellLocation: {
             origin: 'bottom',
             offset: {
+              x: 0,
+              y: 0,
               z: ASPIRATE_OFFSET_FROM_BOTTOM_MM,
             },
           },
@@ -328,6 +347,8 @@ describe('consolidate single-channel', () => {
           wellLocation: {
             origin: 'bottom',
             offset: {
+              x: 0,
+              y: 0,
               z: ASPIRATE_OFFSET_FROM_BOTTOM_MM,
             },
           },
@@ -361,6 +382,8 @@ describe('consolidate single-channel', () => {
         wellLocation: {
           origin: 'bottom',
           offset: {
+            x: 0,
+            y: 0,
             z: ASPIRATE_OFFSET_FROM_BOTTOM_MM,
           },
         },
@@ -371,6 +394,8 @@ describe('consolidate single-channel', () => {
         wellLocation: {
           origin: 'bottom',
           offset: {
+            x: 0,
+            y: 0,
             z: ASPIRATE_OFFSET_FROM_BOTTOM_MM,
           },
         },
@@ -381,6 +406,8 @@ describe('consolidate single-channel', () => {
         wellLocation: {
           origin: 'bottom',
           offset: {
+            x: 0,
+            y: 0,
             z: ASPIRATE_OFFSET_FROM_BOTTOM_MM,
           },
         },
@@ -397,6 +424,8 @@ describe('consolidate single-channel', () => {
         wellLocation: {
           origin: 'bottom',
           offset: {
+            x: 0,
+            y: 0,
             z: ASPIRATE_OFFSET_FROM_BOTTOM_MM,
           },
         },
@@ -407,6 +436,8 @@ describe('consolidate single-channel', () => {
         wellLocation: {
           origin: 'bottom',
           offset: {
+            x: 0,
+            y: 0,
             z: ASPIRATE_OFFSET_FROM_BOTTOM_MM,
           },
         },
@@ -417,6 +448,8 @@ describe('consolidate single-channel', () => {
         wellLocation: {
           origin: 'bottom',
           offset: {
+            x: 0,
+            y: 0,
             z: ASPIRATE_OFFSET_FROM_BOTTOM_MM,
           },
         },
@@ -452,6 +485,8 @@ describe('consolidate single-channel', () => {
         wellLocation: {
           origin: 'bottom',
           offset: {
+            x: 0,
+            y: 0,
             z: DISPENSE_OFFSET_FROM_BOTTOM_MM,
           },
         },
@@ -465,6 +500,8 @@ describe('consolidate single-channel', () => {
         wellLocation: {
           origin: 'bottom',
           offset: {
+            x: 0,
+            y: 0,
             z: DISPENSE_OFFSET_FROM_BOTTOM_MM,
           },
         },
@@ -499,6 +536,8 @@ describe('consolidate single-channel', () => {
           wellLocation: {
             origin: 'bottom',
             offset: {
+              x: 0,
+              y: 0,
               z: DISPENSE_OFFSET_FROM_BOTTOM_MM,
             },
           },
@@ -518,6 +557,8 @@ describe('consolidate single-channel', () => {
           wellLocation: {
             origin: 'bottom',
             offset: {
+              x: 0,
+              y: 0,
               z: DISPENSE_OFFSET_FROM_BOTTOM_MM,
             },
           },
@@ -551,6 +592,8 @@ describe('consolidate single-channel', () => {
         wellLocation: {
           origin: 'bottom',
           offset: {
+            x: 0,
+            y: 0,
             z: DISPENSE_OFFSET_FROM_BOTTOM_MM,
           },
         },
@@ -564,6 +607,8 @@ describe('consolidate single-channel', () => {
         wellLocation: {
           origin: 'bottom',
           offset: {
+            x: 0,
+            y: 0,
             z: DISPENSE_OFFSET_FROM_BOTTOM_MM,
           },
         },
@@ -597,6 +642,8 @@ describe('consolidate single-channel', () => {
         wellLocation: {
           origin: 'bottom',
           offset: {
+            x: 0,
+            y: 0,
             z: ASPIRATE_OFFSET_FROM_BOTTOM_MM,
           },
         },
@@ -614,6 +661,8 @@ describe('consolidate single-channel', () => {
         wellLocation: {
           origin: 'bottom',
           offset: {
+            x: 0,
+            y: 0,
             z: ASPIRATE_OFFSET_FROM_BOTTOM_MM,
           },
         },
@@ -653,6 +702,8 @@ describe('consolidate single-channel', () => {
         wellLocation: {
           origin: 'bottom',
           offset: {
+            x: 0,
+            y: 0,
             z: ASPIRATE_OFFSET_FROM_BOTTOM_MM,
           },
         },
@@ -673,6 +724,8 @@ describe('consolidate single-channel', () => {
         wellLocation: {
           origin: 'bottom',
           offset: {
+            x: 0,
+            y: 0,
             z: ASPIRATE_OFFSET_FROM_BOTTOM_MM,
           },
         },
@@ -713,6 +766,8 @@ describe('consolidate single-channel', () => {
         wellLocation: {
           origin: 'bottom',
           offset: {
+            x: 0,
+            y: 0,
             z: ASPIRATE_OFFSET_FROM_BOTTOM_MM,
           },
         },
@@ -732,6 +787,8 @@ describe('consolidate single-channel', () => {
         wellLocation: {
           origin: 'bottom',
           offset: {
+            x: 0,
+            y: 0,
             z: ASPIRATE_OFFSET_FROM_BOTTOM_MM,
           },
         },
@@ -1054,6 +1111,8 @@ describe('consolidate single-channel', () => {
             wellLocation: {
               origin: 'bottom',
               offset: {
+                x: 0,
+                y: 0,
                 z: 3.1,
               },
             },
@@ -1078,6 +1137,8 @@ describe('consolidate single-channel', () => {
             wellLocation: {
               origin: 'bottom',
               offset: {
+                x: 0,
+                y: 0,
                 z: 3.1,
               },
             },
@@ -1103,6 +1164,8 @@ describe('consolidate single-channel', () => {
             wellLocation: {
               origin: 'bottom',
               offset: {
+                x: 0,
+                y: 0,
                 z: 3.1,
               },
             },
@@ -1161,6 +1224,8 @@ describe('consolidate single-channel', () => {
             wellLocation: {
               origin: 'bottom',
               offset: {
+                x: 0,
+                y: 0,
                 z: 11.54,
               },
             },
@@ -1186,6 +1251,8 @@ describe('consolidate single-channel', () => {
             wellLocation: {
               origin: 'bottom',
               offset: {
+                x: 0,
+                y: 0,
                 z: 3.1,
               },
             },
@@ -1244,6 +1311,8 @@ describe('consolidate single-channel', () => {
             wellLocation: {
               origin: 'bottom',
               offset: {
+                x: 0,
+                y: 0,
                 z: 11.54,
               },
             },
@@ -1269,6 +1338,8 @@ describe('consolidate single-channel', () => {
             wellLocation: {
               origin: 'bottom',
               offset: {
+                x: 0,
+                y: 0,
                 z: 3.2,
               },
             },
@@ -1311,6 +1382,8 @@ describe('consolidate single-channel', () => {
             wellLocation: {
               origin: 'bottom',
               offset: {
+                x: 0,
+                y: 0,
                 z: 3.2,
               },
             },
@@ -1335,6 +1408,8 @@ describe('consolidate single-channel', () => {
             wellLocation: {
               origin: 'bottom',
               offset: {
+                x: 0,
+                y: 0,
                 z: 3.2,
               },
             },
@@ -1348,6 +1423,8 @@ describe('consolidate single-channel', () => {
             seconds: 12,
           },
         },
+        // Blowout to trash
+        ...blowoutInPlaceHelper(),
         // Touch tip (disp)
         {
           commandType: 'touchTip',
@@ -1368,8 +1445,6 @@ describe('consolidate single-channel', () => {
         // No Dispense > Air Gap here because we're re-using the tip
         // for the next chunk
 
-        // Blowout to trash
-        ...blowoutInPlaceHelper(),
         // Second chunk: source well A3
         // pre-wet
         {
@@ -1383,6 +1458,8 @@ describe('consolidate single-channel', () => {
             wellLocation: {
               origin: 'bottom',
               offset: {
+                x: 0,
+                y: 0,
                 z: 3.1,
               },
             },
@@ -1407,6 +1484,8 @@ describe('consolidate single-channel', () => {
             wellLocation: {
               origin: 'bottom',
               offset: {
+                x: 0,
+                y: 0,
                 z: 3.1,
               },
             },
@@ -1432,6 +1511,8 @@ describe('consolidate single-channel', () => {
             wellLocation: {
               origin: 'bottom',
               offset: {
+                x: 0,
+                y: 0,
                 z: 3.1,
               },
             },
@@ -1490,6 +1571,8 @@ describe('consolidate single-channel', () => {
             wellLocation: {
               origin: 'bottom',
               offset: {
+                x: 0,
+                y: 0,
                 z: 11.54,
               },
             },
@@ -1515,6 +1598,8 @@ describe('consolidate single-channel', () => {
             wellLocation: {
               origin: 'bottom',
               offset: {
+                x: 0,
+                y: 0,
                 z: 3.2,
               },
             },
@@ -1557,6 +1642,8 @@ describe('consolidate single-channel', () => {
             wellLocation: {
               origin: 'bottom',
               offset: {
+                x: 0,
+                y: 0,
                 z: 3.2,
               },
             },
@@ -1581,6 +1668,8 @@ describe('consolidate single-channel', () => {
             wellLocation: {
               origin: 'bottom',
               offset: {
+                x: 0,
+                y: 0,
                 z: 3.2,
               },
             },
@@ -1594,6 +1683,8 @@ describe('consolidate single-channel', () => {
             seconds: 12,
           },
         },
+        // Blowout to trash
+        ...blowoutInPlaceHelper(),
         // Touch tip (disp)
         {
           commandType: 'touchTip',
@@ -1610,9 +1701,6 @@ describe('consolidate single-channel', () => {
             },
           },
         },
-
-        // Blowout to trash
-        ...blowoutInPlaceHelper(),
         // Dispense > air gap in dest well
         {
           commandType: 'aspirate',
@@ -1626,6 +1714,8 @@ describe('consolidate single-channel', () => {
             wellLocation: {
               origin: 'bottom',
               offset: {
+                x: 0,
+                y: 0,
                 z: 11.54,
               },
             },
@@ -1696,6 +1786,8 @@ describe('consolidate single-channel', () => {
             wellLocation: {
               origin: 'bottom',
               offset: {
+                x: 0,
+                y: 0,
                 z: 3.1,
               },
             },
@@ -1720,6 +1812,8 @@ describe('consolidate single-channel', () => {
             wellLocation: {
               origin: 'bottom',
               offset: {
+                x: 0,
+                y: 0,
                 z: 3.1,
               },
             },
@@ -1745,6 +1839,8 @@ describe('consolidate single-channel', () => {
             wellLocation: {
               origin: 'bottom',
               offset: {
+                x: 0,
+                y: 0,
                 z: 3.1,
               },
             },
@@ -1803,6 +1899,8 @@ describe('consolidate single-channel', () => {
             wellLocation: {
               origin: 'bottom',
               offset: {
+                x: 0,
+                y: 0,
                 z: 11.54,
               },
             },
@@ -1829,6 +1927,8 @@ describe('consolidate single-channel', () => {
               origin: 'bottom',
               offset: {
                 z: 3.1,
+                x: 0,
+                y: 0,
               },
             },
             flowRate: 2.1,
@@ -1886,6 +1986,8 @@ describe('consolidate single-channel', () => {
             wellLocation: {
               origin: 'bottom',
               offset: {
+                x: 0,
+                y: 0,
                 z: 11.54,
               },
             },
@@ -1911,6 +2013,8 @@ describe('consolidate single-channel', () => {
             wellLocation: {
               origin: 'bottom',
               offset: {
+                x: 0,
+                y: 0,
                 z: 3.2,
               },
             },
@@ -1953,6 +2057,8 @@ describe('consolidate single-channel', () => {
             wellLocation: {
               origin: 'bottom',
               offset: {
+                x: 0,
+                y: 0,
                 z: 3.2,
               },
             },
@@ -1977,6 +2083,8 @@ describe('consolidate single-channel', () => {
             wellLocation: {
               origin: 'bottom',
               offset: {
+                x: 0,
+                y: 0,
                 z: 3.2,
               },
             },
@@ -1988,6 +2096,23 @@ describe('consolidate single-channel', () => {
           key: expect.any(String),
           params: {
             seconds: 12,
+          },
+        },
+        // Blowout to dest well
+        {
+          commandType: 'blowout',
+          key: expect.any(String),
+          params: {
+            pipetteId: 'p300SingleId',
+            labwareId: 'destPlateId',
+            wellName: 'B1',
+            flowRate: 2.3,
+            wellLocation: {
+              origin: 'top',
+              offset: {
+                z: 3.3,
+              },
+            },
           },
         },
         // Touch tip (disp)
@@ -2010,24 +2135,6 @@ describe('consolidate single-channel', () => {
         // No Dispense > Air Gap here because we're re-using the tip
         // for the next chunk
 
-        // Blowout to dest well
-        {
-          commandType: 'blowout',
-          key: expect.any(String),
-          params: {
-            pipetteId: 'p300SingleId',
-            labwareId: 'destPlateId',
-            wellName: 'B1',
-            flowRate: 2.3,
-            wellLocation: {
-              origin: 'bottom',
-              offset: {
-                z: 13.84,
-              },
-            },
-          },
-        },
-
         // Second chunk: source well A3
         // pre-wet
         {
@@ -2041,6 +2148,8 @@ describe('consolidate single-channel', () => {
             wellLocation: {
               origin: 'bottom',
               offset: {
+                x: 0,
+                y: 0,
                 z: 3.1,
               },
             },
@@ -2065,6 +2174,8 @@ describe('consolidate single-channel', () => {
             wellLocation: {
               origin: 'bottom',
               offset: {
+                x: 0,
+                y: 0,
                 z: 3.1,
               },
             },
@@ -2090,6 +2201,8 @@ describe('consolidate single-channel', () => {
             wellLocation: {
               origin: 'bottom',
               offset: {
+                x: 0,
+                y: 0,
                 z: 3.1,
               },
             },
@@ -2148,6 +2261,8 @@ describe('consolidate single-channel', () => {
             wellLocation: {
               origin: 'bottom',
               offset: {
+                x: 0,
+                y: 0,
                 z: 11.54,
               },
             },
@@ -2173,6 +2288,8 @@ describe('consolidate single-channel', () => {
             wellLocation: {
               origin: 'bottom',
               offset: {
+                x: 0,
+                y: 0,
                 z: 3.2,
               },
             },
@@ -2215,6 +2332,8 @@ describe('consolidate single-channel', () => {
             wellLocation: {
               origin: 'bottom',
               offset: {
+                x: 0,
+                y: 0,
                 z: 3.2,
               },
             },
@@ -2239,6 +2358,8 @@ describe('consolidate single-channel', () => {
             wellLocation: {
               origin: 'bottom',
               offset: {
+                x: 0,
+                y: 0,
                 z: 3.2,
               },
             },
@@ -2250,6 +2371,23 @@ describe('consolidate single-channel', () => {
           key: expect.any(String),
           params: {
             seconds: 12,
+          },
+        },
+        // Blowout to dest
+        {
+          commandType: 'blowout',
+          key: expect.any(String),
+          params: {
+            pipetteId: 'p300SingleId',
+            labwareId: 'destPlateId',
+            wellName: 'B1',
+            flowRate: 2.3,
+            wellLocation: {
+              origin: 'top',
+              offset: {
+                z: 3.3,
+              },
+            },
           },
         },
         // Touch tip (disp)
@@ -2268,23 +2406,6 @@ describe('consolidate single-channel', () => {
             },
           },
         },
-        // Blowout to dest
-        {
-          commandType: 'blowout',
-          key: expect.any(String),
-          params: {
-            pipetteId: 'p300SingleId',
-            labwareId: 'destPlateId',
-            wellName: 'B1',
-            flowRate: 2.3,
-            wellLocation: {
-              origin: 'bottom',
-              offset: {
-                z: 13.84,
-              },
-            },
-          },
-        },
         // Dispense > air gap in dest well
         {
           commandType: 'aspirate',
@@ -2298,6 +2419,8 @@ describe('consolidate single-channel', () => {
             wellLocation: {
               origin: 'bottom',
               offset: {
+                x: 0,
+                y: 0,
                 z: 11.54,
               },
             },
@@ -2365,6 +2488,8 @@ describe('consolidate single-channel', () => {
             wellLocation: {
               origin: 'bottom',
               offset: {
+                x: 0,
+                y: 0,
                 z: 3.1,
               },
             },
@@ -2389,6 +2514,8 @@ describe('consolidate single-channel', () => {
             wellLocation: {
               origin: 'bottom',
               offset: {
+                x: 0,
+                y: 0,
                 z: 3.1,
               },
             },
@@ -2414,6 +2541,8 @@ describe('consolidate single-channel', () => {
             wellLocation: {
               origin: 'bottom',
               offset: {
+                x: 0,
+                y: 0,
                 z: 3.1,
               },
             },
@@ -2472,6 +2601,8 @@ describe('consolidate single-channel', () => {
             wellLocation: {
               origin: 'bottom',
               offset: {
+                x: 0,
+                y: 0,
                 z: 11.54,
               },
             },
@@ -2497,6 +2628,8 @@ describe('consolidate single-channel', () => {
             wellLocation: {
               origin: 'bottom',
               offset: {
+                x: 0,
+                y: 0,
                 z: 3.1,
               },
             },
@@ -2555,6 +2688,8 @@ describe('consolidate single-channel', () => {
             wellLocation: {
               origin: 'bottom',
               offset: {
+                x: 0,
+                y: 0,
                 z: 11.54,
               },
             },
@@ -2580,6 +2715,8 @@ describe('consolidate single-channel', () => {
             wellLocation: {
               origin: 'bottom',
               offset: {
+                x: 0,
+                y: 0,
                 z: 3.2,
               },
             },
@@ -2622,6 +2759,8 @@ describe('consolidate single-channel', () => {
             wellLocation: {
               origin: 'bottom',
               offset: {
+                x: 0,
+                y: 0,
                 z: 3.2,
               },
             },
@@ -2646,6 +2785,8 @@ describe('consolidate single-channel', () => {
             wellLocation: {
               origin: 'bottom',
               offset: {
+                x: 0,
+                y: 0,
                 z: 3.2,
               },
             },
@@ -2657,6 +2798,23 @@ describe('consolidate single-channel', () => {
           key: expect.any(String),
           params: {
             seconds: 12,
+          },
+        },
+        // Blowout to dest well
+        {
+          commandType: 'blowout',
+          key: expect.any(String),
+          params: {
+            pipetteId: 'p300SingleId',
+            labwareId: 'destPlateId',
+            wellName: 'B1',
+            flowRate: 2.3,
+            wellLocation: {
+              origin: 'top',
+              offset: {
+                z: 3.3,
+              },
+            },
           },
         },
         // Touch tip (disp)
@@ -2676,24 +2834,6 @@ describe('consolidate single-channel', () => {
           },
         },
 
-        // Blowout to dest well
-        {
-          commandType: 'blowout',
-          key: expect.any(String),
-          params: {
-            pipetteId: 'p300SingleId',
-            labwareId: 'destPlateId',
-            wellName: 'B1',
-            flowRate: 2.3,
-            wellLocation: {
-              origin: 'bottom',
-              offset: {
-                z: 13.84,
-              },
-            },
-          },
-        },
-
         // Change tip is "always" so we can Dispense > Air Gap here
         {
           commandType: 'aspirate',
@@ -2706,6 +2846,8 @@ describe('consolidate single-channel', () => {
             wellLocation: {
               origin: 'bottom',
               offset: {
+                x: 0,
+                y: 0,
                 z: 11.54,
               },
             },
@@ -2745,6 +2887,8 @@ describe('consolidate single-channel', () => {
             wellLocation: {
               origin: 'bottom',
               offset: {
+                x: 0,
+                y: 0,
                 z: 3.1,
               },
             },
@@ -2770,6 +2914,8 @@ describe('consolidate single-channel', () => {
               origin: 'bottom',
               offset: {
                 z: 3.1,
+                x: 0,
+                y: 0,
               },
             },
             flowRate: 2.2,
@@ -2794,6 +2940,8 @@ describe('consolidate single-channel', () => {
             wellLocation: {
               origin: 'bottom',
               offset: {
+                x: 0,
+                y: 0,
                 z: 3.1,
               },
             },
@@ -2852,6 +3000,8 @@ describe('consolidate single-channel', () => {
             wellLocation: {
               origin: 'bottom',
               offset: {
+                x: 0,
+                y: 0,
                 z: 11.54,
               },
             },
@@ -2877,6 +3027,8 @@ describe('consolidate single-channel', () => {
             wellLocation: {
               origin: 'bottom',
               offset: {
+                x: 0,
+                y: 0,
                 z: 3.2,
               },
             },
@@ -2919,6 +3071,8 @@ describe('consolidate single-channel', () => {
             wellLocation: {
               origin: 'bottom',
               offset: {
+                x: 0,
+                y: 0,
                 z: 3.2,
               },
             },
@@ -2943,6 +3097,8 @@ describe('consolidate single-channel', () => {
             wellLocation: {
               origin: 'bottom',
               offset: {
+                x: 0,
+                y: 0,
                 z: 3.2,
               },
             },
@@ -2954,6 +3110,23 @@ describe('consolidate single-channel', () => {
           key: expect.any(String),
           params: {
             seconds: 12,
+          },
+        },
+        // Blowout to dest
+        {
+          commandType: 'blowout',
+          key: expect.any(String),
+          params: {
+            pipetteId: 'p300SingleId',
+            labwareId: 'destPlateId',
+            wellName: 'B1',
+            flowRate: 2.3,
+            wellLocation: {
+              origin: 'top',
+              offset: {
+                z: 3.3,
+              },
+            },
           },
         },
         // Touch tip (disp)
@@ -2972,23 +3145,6 @@ describe('consolidate single-channel', () => {
             },
           },
         },
-        // Blowout to dest
-        {
-          commandType: 'blowout',
-          key: expect.any(String),
-          params: {
-            pipetteId: 'p300SingleId',
-            labwareId: 'destPlateId',
-            wellName: 'B1',
-            flowRate: 2.3,
-            wellLocation: {
-              origin: 'bottom',
-              offset: {
-                z: 13.84,
-              },
-            },
-          },
-        },
         // Dispense > air gap in dest well
         {
           commandType: 'aspirate',
@@ -3001,6 +3157,8 @@ describe('consolidate single-channel', () => {
             wellLocation: {
               origin: 'bottom',
               offset: {
+                x: 0,
+                y: 0,
                 z: 11.54,
               },
             },
@@ -3057,7 +3215,12 @@ describe('consolidate multi-channel', () => {
     const data: ConsolidateArgs = {
       ...args,
       volume: 140,
+      tipRack: getLabwareDefURI(fixtureTiprack300ul as LabwareDefinition2),
       changeTip: 'once',
+      aspirateXOffset: 0,
+      dispenseXOffset: 0,
+      aspirateYOffset: 0,
+      dispenseYOffset: 0,
     } as ConsolidateArgs
     const result = consolidate(data, invariantContext, initialRobotState)
     const res = getSuccessResult(result)

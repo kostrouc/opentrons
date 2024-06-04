@@ -12,7 +12,8 @@ from .pipetting_common import (
     MovementMixin,
     DestinationPositionResult,
 )
-from .command import AbstractCommandImpl, BaseCommand, BaseCommandCreate
+from .command import AbstractCommandImpl, BaseCommand, BaseCommandCreate, SuccessData
+from ..errors.error_occurrence import ErrorOccurrence
 
 if TYPE_CHECKING:
     from ..execution import MovementHandler
@@ -64,6 +65,15 @@ class MoveToAddressableAreaForDropTipParams(PipetteIdMixin, MovementMixin):
             " If False, the tip will be dropped at the top center of the area."
         ),
     )
+    ignoreTipConfiguration: Optional[bool] = Field(
+        True,
+        description=(
+            "Whether to utilize the critical point of the tip configuraiton when moving to an addressable area."
+            " If True, this command will ignore the tip configuration and use the center of the entire instrument"
+            " as the critical point for movement."
+            " If False, this command will use the critical point provided by the current tip configuration."
+        ),
+    )
 
 
 class MoveToAddressableAreaForDropTipResult(DestinationPositionResult):
@@ -74,7 +84,8 @@ class MoveToAddressableAreaForDropTipResult(DestinationPositionResult):
 
 class MoveToAddressableAreaForDropTipImplementation(
     AbstractCommandImpl[
-        MoveToAddressableAreaForDropTipParams, MoveToAddressableAreaForDropTipResult
+        MoveToAddressableAreaForDropTipParams,
+        SuccessData[MoveToAddressableAreaForDropTipResult, None],
     ]
 ):
     """Move to addressable area for drop tip command implementation."""
@@ -87,7 +98,7 @@ class MoveToAddressableAreaForDropTipImplementation(
 
     async def execute(
         self, params: MoveToAddressableAreaForDropTipParams
-    ) -> MoveToAddressableAreaForDropTipResult:
+    ) -> SuccessData[MoveToAddressableAreaForDropTipResult, None]:
         """Move the requested pipette to the requested addressable area in preperation of a drop tip."""
         self._state_view.addressable_areas.raise_if_area_not_in_deck_configuration(
             params.addressableAreaName
@@ -113,14 +124,22 @@ class MoveToAddressableAreaForDropTipImplementation(
             force_direct=params.forceDirect,
             minimum_z_height=params.minimumZHeight,
             speed=params.speed,
+            ignore_tip_configuration=params.ignoreTipConfiguration,
         )
 
-        return MoveToAddressableAreaForDropTipResult(position=DeckPoint(x=x, y=y, z=z))
+        return SuccessData(
+            public=MoveToAddressableAreaForDropTipResult(
+                position=DeckPoint(x=x, y=y, z=z)
+            ),
+            private=None,
+        )
 
 
 class MoveToAddressableAreaForDropTip(
     BaseCommand[
-        MoveToAddressableAreaForDropTipParams, MoveToAddressableAreaForDropTipResult
+        MoveToAddressableAreaForDropTipParams,
+        MoveToAddressableAreaForDropTipResult,
+        ErrorOccurrence,
     ]
 ):
     """Move to addressable area for drop tip command model."""

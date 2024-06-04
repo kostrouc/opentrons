@@ -5,10 +5,8 @@ import reduce from 'lodash/reduce'
 import {
   getIsTiprack,
   getLabwareDefURI,
-  getWellsDepth,
   getWellNamePerMultiTip,
   WASTE_CHUTE_CUTOUT,
-  PipetteChannels,
   ONE_CHANNEL_WASTE_CHUTE_ADDRESSABLE_AREA,
   EIGHT_CHANNEL_WASTE_CHUTE_ADDRESSABLE_AREA,
   NINETY_SIX_CHANNEL_WASTE_CHUTE_ADDRESSABLE_AREA,
@@ -23,8 +21,12 @@ import {
 import { blowout } from '../commandCreators/atomic/blowout'
 import { curryCommandCreator } from './curryCommandCreator'
 import { movableTrashCommandsUtil } from './movableTrashCommandsUtil'
-import type { LabwareDefinition2 } from '@opentrons/shared-data'
-import type { BlowoutParams } from '@opentrons/shared-data/protocol/types/schemaV4'
+import type {
+  AddressableAreaName,
+  LabwareDefinition2,
+  BlowoutParams,
+  PipetteChannels,
+} from '@opentrons/shared-data'
 import type {
   AdditionalEquipmentEntities,
   AdditionalEquipmentEntity,
@@ -46,7 +48,7 @@ type trashOrLabware = 'wasteChute' | 'trashBin' | 'labware' | null
 
 export function getWasteChuteAddressableAreaNamePip(
   channels: PipetteChannels
-): string {
+): AddressableAreaName {
   switch (channels) {
     case 1: {
       return ONE_CHANNEL_WASTE_CHUTE_ADDRESSABLE_AREA
@@ -241,15 +243,15 @@ export function getWellsForTips(
 // the SOURCE_WELL_BLOWOUT_DESTINATION / DEST_WELL_BLOWOUT_DESTINATION
 // special strings, or to a labware ID.
 export const blowoutUtil = (args: {
-  pipette: BlowoutParams['pipette']
+  pipette: BlowoutParams['pipetteId']
   sourceLabwareId: string
-  sourceWell: BlowoutParams['well']
+  sourceWell: BlowoutParams['wellName']
   destLabwareId: string
   blowoutLocation: string | null | undefined
   flowRate: number
   offsetFromTopMm: number
   invariantContext: InvariantContext
-  destWell: BlowoutParams['well'] | null
+  destWell: BlowoutParams['wellName'] | null
   prevRobotState: RobotState
 }): CurriedCommandCreator[] => {
   const {
@@ -290,18 +292,18 @@ export const blowoutUtil = (args: {
     well = trashOrLabware === 'labware' ? 'A1' : null
   }
 
-  const wellDepth =
-    labware != null && well != null ? getWellsDepth(labware.def, [well]) : 0
-
-  const offsetFromBottomMm = wellDepth + offsetFromTopMm
   if (well != null && trashOrLabware === 'labware' && labware != null) {
     return [
       curryCommandCreator(blowout, {
-        pipette: pipette,
-        labware: labware.id,
-        well,
+        pipetteId: pipette,
+        labwareId: labware.id,
+        wellName: well,
         flowRate,
-        offsetFromBottomMm,
+        wellLocation: {
+          offset: {
+            z: offsetFromTopMm,
+          },
+        },
       }),
     ]
   } else if (trashOrLabware === 'wasteChute') {
@@ -476,6 +478,8 @@ interface DispenseLocationHelperArgs {
   pipetteId: string
   volume: number
   flowRate: number
+  xOffset: number
+  yOffset: number
   offsetFromBottomMm?: number
   well?: string
 }
@@ -491,6 +495,8 @@ export const dispenseLocationHelper: CommandCreator<DispenseLocationHelperArgs> 
     flowRate,
     offsetFromBottomMm,
     well,
+    xOffset,
+    yOffset,
   } = args
 
   const trashOrLabware = getTrashOrLabware(
@@ -513,6 +519,8 @@ export const dispenseLocationHelper: CommandCreator<DispenseLocationHelperArgs> 
         well,
         flowRate,
         offsetFromBottomMm,
+        xOffset,
+        yOffset,
       }),
     ]
   } else if (trashOrLabware === 'wasteChute') {
@@ -601,6 +609,7 @@ interface AirGapArgs {
   destWell: string | null
   flowRate: number
   offsetFromBottomMm: number
+  tipRack: string
   pipetteId: string
   volume: number
   blowOutLocation?: string | null
@@ -619,6 +628,7 @@ export const airGapHelper: CommandCreator<AirGapArgs> = (
     flowRate,
     offsetFromBottomMm,
     pipetteId,
+    tipRack,
     sourceId,
     sourceWell,
     volume,
@@ -654,6 +664,9 @@ export const airGapHelper: CommandCreator<AirGapArgs> = (
           flowRate,
           offsetFromBottomMm,
           isAirGap: true,
+          tipRack,
+          xOffset: 0,
+          yOffset: 0,
         }),
       ]
       //  when aspirating out of multi wells for consolidate
@@ -667,6 +680,10 @@ export const airGapHelper: CommandCreator<AirGapArgs> = (
           flowRate,
           offsetFromBottomMm,
           isAirGap: true,
+          tipRack,
+          //  NOTE: airgap aspirates happen at default x/y offset
+          xOffset: 0,
+          yOffset: 0,
         }),
       ]
     }

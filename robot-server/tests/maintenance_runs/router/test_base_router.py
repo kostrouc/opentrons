@@ -6,7 +6,7 @@ from decoy import Decoy
 from opentrons.types import DeckSlotName
 from opentrons.protocol_engine import LabwareOffsetCreate, types as pe_types
 
-from robot_server.errors import ApiError
+from robot_server.errors.error_responses import ApiError
 from robot_server.service.json_api import (
     RequestModel,
     SimpleEmptyBody,
@@ -34,6 +34,11 @@ from robot_server.maintenance_runs.router.base_router import (
 )
 
 from robot_server.deck_configuration.store import DeckConfigurationStore
+
+
+def mock_notify_publishers() -> None:
+    """A mock notify_publishers."""
+    return None
 
 
 @pytest.fixture
@@ -79,6 +84,7 @@ async def test_create_run(
             created_at=run_created_at,
             labware_offsets=[labware_offset_create],
             deck_configuration=[],
+            notify_publishers=mock_notify_publishers,
         )
     ).then_return(expected_response)
 
@@ -91,6 +97,7 @@ async def test_create_run(
         created_at=run_created_at,
         is_ok_to_create_maintenance_run=True,
         deck_configuration_store=mock_deck_configuration_store,
+        notify_publishers=mock_notify_publishers,
     )
 
     assert result.content.data == expected_response

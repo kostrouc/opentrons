@@ -1,9 +1,15 @@
 import * as React from 'react'
+import { vi, it, describe, expect, beforeEach } from 'vitest'
 import { fireEvent } from '@testing-library/react'
-import { nestedTextMatcher, renderWithProviders } from '@opentrons/components'
-import { LEFT, PipetteNameSpecs } from '@opentrons/shared-data'
+
+import { LEFT } from '@opentrons/shared-data'
+import {
+  nestedTextMatcher,
+  renderWithProviders,
+} from '../../../__testing-utils__'
 import { i18n } from '../../../i18n'
 import { LevelPipette } from '../LevelPipette'
+import type { PipetteNameSpecs } from '@opentrons/shared-data'
 
 const render = (props: React.ComponentProps<typeof LevelPipette>) => {
   return renderWithProviders(<LevelPipette {...props} />, {
@@ -60,7 +66,7 @@ describe('LevelPipette', () => {
     props = {
       mount: LEFT,
       pipetteModelName: MOCK_WANTED_PIPETTE.name,
-      confirm: jest.fn(),
+      confirm: vi.fn(),
     }
   })
 

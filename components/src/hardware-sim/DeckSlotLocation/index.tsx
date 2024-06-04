@@ -1,6 +1,9 @@
 import * as React from 'react'
-import { getPositionFromSlotId, OT2_ROBOT_TYPE } from '@opentrons/shared-data'
-import ot2DeckDefV4 from '@opentrons/shared-data/deck/definitions/4/ot2_standard.json'
+import {
+  getPositionFromSlotId,
+  OT2_ROBOT_TYPE,
+  ot2DeckDefV5,
+} from '@opentrons/shared-data'
 
 import { SlotBase } from '../BaseDeck/SlotBase'
 
@@ -16,6 +19,8 @@ interface LegacyDeckSlotLocationProps extends React.SVGProps<SVGGElement> {
   slotBaseColor?: React.SVGProps<SVGPathElement>['fill']
   slotClipColor?: React.SVGProps<SVGPathElement>['stroke']
 }
+
+type AddressableAreaFromDeckDef = typeof ot2DeckDefV5.locations.addressableAreas[number]
 
 // dimensions of the OT-2 fixed trash, not in deck definition
 export const OT2_FIXED_TRASH_X_DIMENSION = 172.86
@@ -37,8 +42,8 @@ export function LegacyDeckSlotLocation(
 
   if (robotType !== OT2_ROBOT_TYPE) return null
 
-  const slotDef = ot2DeckDefV4.locations.addressableAreas.find(
-    s => s.id === slotName
+  const slotDef = ot2DeckDefV5.locations.addressableAreas.find(
+    (s: AddressableAreaFromDeckDef) => s.id === slotName
   )
   if (slotDef == null) {
     console.warn(
@@ -49,7 +54,7 @@ export function LegacyDeckSlotLocation(
 
   const slotPosition = getPositionFromSlotId(
     slotName,
-    (ot2DeckDefV4 as unknown) as DeckDefinition
+    (ot2DeckDefV5 as unknown) as DeckDefinition
   )
 
   const isFixedTrash = slotName === 'fixedTrash'

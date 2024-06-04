@@ -1,15 +1,16 @@
 import type {
-  CompletedProtocolAnalysis,
+  AddressableAreaName,
   MoveToAddressableAreaParams,
 } from '@opentrons/shared-data'
 import type { TFunction } from 'i18next'
+import type { CommandTextData } from '../types'
 
 export function getAddressableAreaDisplayName(
-  analysis: CompletedProtocolAnalysis,
+  commandTextData: CommandTextData,
   commandId: string,
   t: TFunction
 ): string {
-  const addressableAreaCommand = (analysis?.commands ?? []).find(
+  const addressableAreaCommand = (commandTextData?.commands ?? []).find(
     command => command.id === commandId
   )
 
@@ -32,7 +33,9 @@ export function getAddressableAreaDisplayName(
   else return addressableAreaName
 }
 
-const getMovableTrashSlot = (addressableAreaName: string): string => {
+const getMovableTrashSlot = (
+  addressableAreaName: AddressableAreaName
+): string => {
   switch (addressableAreaName) {
     case 'movableTrashA1':
       return 'A1'

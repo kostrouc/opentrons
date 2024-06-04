@@ -1,6 +1,9 @@
 import * as React from 'react'
+import '@testing-library/jest-dom/vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { fireEvent, screen } from '@testing-library/react'
-import { renderWithProviders, COLORS, BORDERS } from '@opentrons/components'
+import { COLORS, BORDERS } from '@opentrons/components'
+import { renderWithProviders } from '../../../__testing-utils__'
 
 import { MediumButton } from '../MediumButton'
 
@@ -12,7 +15,7 @@ describe('MediumButton', () => {
   let props: React.ComponentProps<typeof MediumButton>
   beforeEach(() => {
     props = {
-      onClick: jest.fn(),
+      onClick: vi.fn(),
       buttonType: 'primary',
       buttonText: 'Medium button',
     }
@@ -21,9 +24,6 @@ describe('MediumButton', () => {
     render(props)
     fireEvent.click(screen.getByText('Medium button'))
     expect(props.onClick).toHaveBeenCalled()
-    expect(screen.getByRole('button')).toHaveStyle(
-      `background-color: ${COLORS.blueEnabled}`
-    )
   })
   it('renders the alert button', () => {
     props = {
@@ -32,7 +32,7 @@ describe('MediumButton', () => {
     }
     render(props)
     expect(screen.getByRole('button')).toHaveStyle(
-      `background-color: ${COLORS.red2}`
+      `background-color: ${COLORS.red50}`
     )
   })
   it('renders the secondary button', () => {
@@ -42,7 +42,7 @@ describe('MediumButton', () => {
     }
     render(props)
     expect(screen.getByRole('button')).toHaveStyle(
-      `background-color: ${COLORS.mediumBlueEnabled}`
+      `background-color: ${COLORS.blue35}`
     )
   })
   it('renders the secondary alert button', () => {
@@ -52,7 +52,7 @@ describe('MediumButton', () => {
     }
     render(props)
     expect(screen.getByRole('button')).toHaveStyle(
-      `background-color: ${COLORS.red3}`
+      `background-color: ${COLORS.red35}`
     )
   })
   it('renders the tertiary high button', () => {
@@ -88,8 +88,8 @@ describe('MediumButton', () => {
       ...props,
       iconName: 'restart',
     }
-    const { getByLabelText } = render(props)
-    getByLabelText('restart icon')
+    render(props)
+    screen.getByLabelText('restart icon')
   })
   it('renders the rounded button category', () => {
     props = {
@@ -98,7 +98,7 @@ describe('MediumButton', () => {
     }
     render(props)
     expect(screen.getByRole('button')).toHaveStyle(
-      `border-radius: ${BORDERS.borderRadiusSize5}`
+      `border-radius: ${BORDERS.borderRadius40}`
     )
   })
 })

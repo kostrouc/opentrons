@@ -1,18 +1,18 @@
 import * as React from 'react'
 import { css } from 'styled-components'
 import {
-  Btn,
-  Icon,
-  TYPOGRAPHY,
-  Flex,
   ALIGN_CENTER,
+  Btn,
+  COLORS,
+  Flex,
+  Icon,
+  JUSTIFY_CENTER,
   JUSTIFY_SPACE_BETWEEN,
   SPACING,
-  JUSTIFY_CENTER,
-  COLORS,
+  StyledText,
+  TYPOGRAPHY,
 } from '@opentrons/components'
 
-import { StyledText } from '../../atoms/text'
 import { Divider } from '../../atoms/structure'
 import type { IconProps } from '@opentrons/components'
 
@@ -33,11 +33,11 @@ const closeIconStyles = css`
   width: 1.625rem;
   height: 1.625rem;
   &:hover {
-    background-color: ${COLORS.lightGreyHover};
+    background-color: ${COLORS.grey30};
   }
 
   &:active {
-    background-color: ${COLORS.lightGreyPressed};
+    background-color: ${COLORS.grey35};
   }
 `
 

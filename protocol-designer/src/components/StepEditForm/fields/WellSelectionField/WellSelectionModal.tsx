@@ -7,14 +7,9 @@ import {
   Modal,
   OutlineButton,
   LabeledValue,
-  WellGroup,
   WELL_LABEL_OPTIONS,
 } from '@opentrons/components'
-import {
-  sortWells,
-  LabwareDefinition2,
-  PipetteNameSpecs,
-} from '@opentrons/shared-data'
+import { sortWells } from '@opentrons/shared-data'
 
 import { arrayToWellGroup } from '../../../../utils'
 import * as wellContentsSelectors from '../../../../top-selectors/well-contents'
@@ -23,13 +18,15 @@ import { selectors as stepFormSelectors } from '../../../../step-forms'
 import { WellSelectionInstructions } from '../../../WellSelectionInstructions'
 import { SelectableLabware, wellFillFromWellContents } from '../../../labware'
 
+import type { LabwareDefinition2, PipetteV2Specs } from '@opentrons/shared-data'
+import type { WellGroup } from '@opentrons/components'
 import type { ContentsByWell } from '../../../../labware-ingred/types'
 import type { WellIngredientNames } from '../../../../steplist/types'
 import type { StepFieldName } from '../../../../form-types'
 import type { NozzleType } from '../../../../types'
 
-import styles from './WellSelectionModal.css'
-import modalStyles from '../../../modals/modal.css'
+import styles from './WellSelectionModal.module.css'
+import modalStyles from '../../../modals/modal.module.css'
 
 interface WellSelectionModalProps {
   isOpen: boolean
@@ -54,7 +51,7 @@ interface WellSelectionModalComponentProps {
   updateHighlightedWells: (wellGroup: WellGroup) => unknown
   wellContents: ContentsByWell
   labwareDef?: LabwareDefinition2 | null
-  pipetteSpec?: PipetteNameSpecs | null
+  pipetteSpec?: PipetteV2Specs | null
 }
 
 const WellSelectionModalComponent = (
@@ -131,6 +128,7 @@ export const WellSelectionModal = (
     onCloseClick,
     pipetteId,
     nozzleType = null,
+    updateValue,
   } = props
   const wellFieldData = props.value
   // selector data
@@ -170,7 +168,7 @@ export const WellSelectionModal = (
 
   const handleSave = (): void => {
     const sortedWells = Object.keys(selectedPrimaryWells).sort(sortWells)
-    props.updateValue(sortedWells)
+    updateValue(sortedWells)
     onCloseClick()
   }
 

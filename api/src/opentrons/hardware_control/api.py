@@ -65,7 +65,7 @@ from .robot_calibration import (
     RobotCalibration,
 )
 from .protocols import HardwareControlInterface
-from .instruments.ot2.pipette_handler import PipetteHandlerProvider
+from .instruments.ot2.pipette_handler import PipetteHandlerProvider, PickUpTipSpec
 from .instruments.ot2.instrument_calibration import load_pipette_offset
 from .motion_utilities import (
     target_position_from_absolute,
@@ -77,6 +77,8 @@ from .motion_utilities import (
 
 
 mod_log = logging.getLogger(__name__)
+
+AttachedModuleSpec = Dict[str, List[Union[str, Tuple[str, str]]]]
 
 
 class API(
@@ -167,8 +169,8 @@ class API(
     def _reset_last_mount(self) -> None:
         self._last_moved_mount = None
 
-    @classmethod  # noqa: C901
-    async def build_hardware_controller(
+    @classmethod
+    async def build_hardware_controller(  # noqa: C901
         cls,
         config: Union[RobotConfig, OT3Config, None] = None,
         port: Optional[str] = None,
@@ -255,7 +257,7 @@ class API(
         attached_instruments: Optional[
             Dict[top_types.Mount, Dict[str, Optional[str]]]
         ] = None,
-        attached_modules: Optional[List[str]] = None,
+        attached_modules: Optional[Dict[str, List[modules.SimulatingModule]]] = None,
         config: Optional[Union[RobotConfig, OT3Config]] = None,
         loop: Optional[asyncio.AbstractEventLoop] = None,
         strict_attached_instruments: bool = True,
@@ -271,7 +273,7 @@ class API(
             attached_instruments = {}
 
         if None is attached_modules:
-            attached_modules = []
+            attached_modules = {}
 
         checked_loop = use_or_initialize_loop(loop)
         if isinstance(config, RobotConfig):
@@ -347,6 +349,7 @@ class API(
     def board_revision(self) -> str:
         return str(self._backend.board_revision)
 
+    @property
     def attached_subsystems(self) -> Dict[SubSystem, SubSystemState]:
         return {}
 
@@ -430,7 +433,9 @@ class API(
         return False
 
     async def cache_instruments(
-        self, require: Optional[Dict[top_types.Mount, PipetteName]] = None
+        self,
+        require: Optional[Dict[top_types.Mount, PipetteName]] = None,
+        skip_if_would_block: bool = False,
     ) -> None:
         """
         Scan the attached instruments, take necessary configuration actions,
@@ -618,6 +623,7 @@ class API(
                     home_flagged_axes=False,
                 )
 
+    @ExecutionManagerProvider.wait_for_running
     async def home_plunger(self, mount: top_types.Mount) -> None:
         """
         Home the plunger motor for a mount, and then return it to the 'bottom'
@@ -760,7 +766,7 @@ class API(
             top_types.Point(0, 0, 0),
         )
 
-        await self._cache_and_maybe_retract_mount(mount)
+        await self.prepare_for_mount_movement(mount)
         await self._move(target_position, speed=speed, max_speeds=max_speeds)
 
     async def move_axes(
@@ -820,7 +826,7 @@ class API(
                 detail={"mount": str(mount), "unhomed_axes": str(unhomed)},
             )
 
-        await self._cache_and_maybe_retract_mount(mount)
+        await self.prepare_for_mount_movement(mount)
         await self._move(
             target_position,
             speed=speed,
@@ -839,6 +845,9 @@ class API(
         if mount != self._last_moved_mount and self._last_moved_mount:
             await self.retract(self._last_moved_mount, 10)
         self._last_moved_mount = mount
+
+    async def prepare_for_mount_movement(self, mount: top_types.Mount) -> None:
+        await self._cache_and_maybe_retract_mount(mount)
 
     @ExecutionManagerProvider.wait_for_running
     async def _move(
@@ -908,11 +917,11 @@ class API(
     async def disengage_axes(self, which: List[Axis]) -> None:
         await self._backend.disengage_axes([ot2_axis_to_string(ax) for ax in which])
 
+    @ExecutionManagerProvider.wait_for_running
     async def _fast_home(self, axes: Sequence[str], margin: float) -> Dict[str, float]:
         converted_axes = "".join(axes)
         return await self._backend.fast_home(converted_axes, margin)
 
-    @ExecutionManagerProvider.wait_for_running
     async def retract(self, mount: top_types.Mount, margin: float = 10) -> None:
         """Pull the specified mount up to its home position.
 
@@ -920,7 +929,6 @@ class API(
         """
         await self.retract_axis(Axis.by_mount(mount), margin)
 
-    @ExecutionManagerProvider.wait_for_running
     async def retract_axis(self, axis: Axis, margin: float = 10) -> None:
         """Pull the specified axis up to its home position.
 
@@ -1144,6 +1152,30 @@ class API(
                 mount, back_left_nozzle, front_right_nozzle, starting_nozzle
             )
 
+    async def tip_pickup_moves(
+        self,
+        mount: top_types.Mount,
+        spec: PickUpTipSpec,
+    ) -> None:
+        for press in spec.presses:
+            with self._backend.save_current():
+                self._backend.set_active_current(press.current)
+                target_down = target_position_from_relative(
+                    mount, press.relative_down, self._current_position
+                )
+                await self._move(target_down, speed=press.speed)
+            target_up = target_position_from_relative(
+                mount, press.relative_up, self._current_position
+            )
+            await self._move(target_up)
+        # neighboring tips tend to get stuck in the space between
+        # the volume chamber and the drop-tip sleeve on p1000.
+        # This extra shake ensures those tips are removed
+        for rel_point, speed in spec.shake_off_list:
+            await self.move_rel(mount, rel_point, speed=speed)
+
+        await self.retract(mount, spec.retract_target)
+
     async def pick_up_tip(
         self,
         mount: top_types.Mount,
@@ -1168,25 +1200,9 @@ class API(
             home_flagged_axes=False,
         )
 
-        for press in spec.presses:
-            with self._backend.save_current():
-                self._backend.set_active_current(press.current)
-                target_down = target_position_from_relative(
-                    mount, press.relative_down, self._current_position
-                )
-                await self._move(target_down, speed=press.speed)
-            target_up = target_position_from_relative(
-                mount, press.relative_up, self._current_position
-            )
-            await self._move(target_up)
+        await self.tip_pickup_moves(mount, spec)
         _add_tip_to_instrs()
-        # neighboring tips tend to get stuck in the space between
-        # the volume chamber and the drop-tip sleeve on p1000.
-        # This extra shake ensures those tips are removed
-        for rel_point, speed in spec.shake_off_list:
-            await self.move_rel(mount, rel_point, speed=speed)
 
-        await self.retract(mount, spec.retract_target)
         if prep_after:
             await self.prepare_for_aspirate(mount)
 
@@ -1206,9 +1222,9 @@ class API(
                 home_flagged_axes=False,
             )
             if move.home_after:
-                smoothie_pos = await self._backend.fast_home(
-                    [ot2_axis_to_string(ax) for ax in move.home_axes],
-                    move.home_after_safety_margin,
+                smoothie_pos = await self._fast_home(
+                    axes=[ot2_axis_to_string(ax) for ax in move.home_axes],
+                    margin=move.home_after_safety_margin,
                 )
                 self._current_position = deck_from_machine(
                     machine_pos=self._axis_map_from_string_map(smoothie_pos),

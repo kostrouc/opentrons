@@ -1,5 +1,4 @@
 import {
-  FormError,
   composeErrors,
   incompatibleAspirateLabware,
   incompatibleDispenseLabware,
@@ -21,17 +20,19 @@ import {
 } from './errors'
 
 import {
-  FormWarning,
-  FormWarningType,
   composeWarnings,
   belowPipetteMinimumVolume,
   maxDispenseWellVolume,
   minDisposalVolume,
   minAspirateAirGapVolume,
   minDispenseAirGapVolume,
+  mixTipPositionInTube,
+  tipPositionInTube,
 } from './warnings'
 
-import { HydratedFormdata, StepType } from '../../form-types'
+import type { FormWarning, FormWarningType } from './warnings'
+import type { HydratedFormdata, StepType } from '../../form-types'
+import type { FormError } from './errors'
 export { handleFormChange } from './handleFormChange'
 export { createBlankForm } from './createBlankForm'
 export { getDefaultsForStepType } from './getDefaultsForStepType'
@@ -52,7 +53,10 @@ interface FormHelpers {
 const stepFormHelperMap: Partial<Record<StepType, FormHelpers>> = {
   mix: {
     getErrors: composeErrors(incompatibleLabware, volumeTooHigh),
-    getWarnings: composeWarnings(belowPipetteMinimumVolume),
+    getWarnings: composeWarnings(
+      belowPipetteMinimumVolume,
+      mixTipPositionInTube
+    ),
   },
   pause: {
     getErrors: composeErrors(pauseForTimeOrUntilTold),
@@ -68,7 +72,8 @@ const stepFormHelperMap: Partial<Record<StepType, FormHelpers>> = {
       maxDispenseWellVolume,
       minDisposalVolume,
       minAspirateAirGapVolume,
-      minDispenseAirGapVolume
+      minDispenseAirGapVolume,
+      tipPositionInTube
     ),
   },
   magnet: {

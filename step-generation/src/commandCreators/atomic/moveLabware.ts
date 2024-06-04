@@ -1,7 +1,5 @@
 import {
-  CreateCommand,
   HEATERSHAKER_MODULE_TYPE,
-  LabwareMovementStrategy,
   THERMOCYCLER_MODULE_TYPE,
 } from '@opentrons/shared-data'
 import * as errorCreators from '../../errorCreators'
@@ -12,6 +10,10 @@ import {
   getLabwareHasLiquid,
   uuid,
 } from '../../utils'
+import type {
+  CreateCommand,
+  LabwareMovementStrategy,
+} from '@opentrons/shared-data'
 import type {
   CommandCreator,
   CommandCreatorError,
@@ -36,6 +38,9 @@ export const moveLabware: CommandCreator<MoveLabwareArgs> = (
     prevRobotState.liquidState != null
       ? getLabwareHasLiquid(prevRobotState.liquidState, labware)
       : false
+  const hasTipOnPipettes = Object.values(
+    prevRobotState.tipState.pipettes
+  ).includes(true)
   const actionName = 'moveToLabware'
   const errors: CommandCreatorError[] = []
   const warnings: CommandCreatorWarning[] = []
@@ -49,6 +54,20 @@ export const moveLabware: CommandCreator<MoveLabwareArgs> = (
     aE => aE.name === 'gripper'
   )
 
+  const newLocationSlot =
+    newLocation !== 'offDeck' && 'slotName' in newLocation
+      ? newLocation.slotName
+      : null
+
+  const multipleObjectsInSameSlotLabware =
+    Object.values(prevRobotState.labware).find(
+      labware => labware.slot === newLocationSlot
+    ) != null
+
+  const multipleObjectsInSameSlotModule = Object.values(
+    prevRobotState.modules
+  ).find(module => module.slot === newLocationSlot)
+
   if (!labware || !prevRobotState.labware[labware]) {
     errors.push(
       errorCreators.labwareDoesNotExist({
@@ -58,6 +77,11 @@ export const moveLabware: CommandCreator<MoveLabwareArgs> = (
     )
   } else if (prevRobotState.labware[labware].slot === 'offDeck' && useGripper) {
     errors.push(errorCreators.labwareOffDeck())
+  } else if (
+    multipleObjectsInSameSlotLabware ||
+    multipleObjectsInSameSlotModule
+  ) {
+    errors.push(errorCreators.multipleEntitiesOnSameSlotName())
   }
 
   const isAluminumBlock =
@@ -74,7 +98,15 @@ export const moveLabware: CommandCreator<MoveLabwareArgs> = (
     errors.push(errorCreators.gripperRequired())
   }
 
+  if (hasTipOnPipettes && useGripper) {
+    errors.push(errorCreators.pipetteHasTip())
+  }
+
   const initialLabwareSlot = prevRobotState.labware[labware]?.slot
+
+  if (hasWasteChute && initialLabwareSlot === 'gripperWasteChute') {
+    errors.push(errorCreators.labwareDiscarded())
+  }
   const initialAdapterSlot = prevRobotState.labware[initialLabwareSlot]?.slot
   const initialSlot =
     initialAdapterSlot != null ? initialAdapterSlot : initialLabwareSlot

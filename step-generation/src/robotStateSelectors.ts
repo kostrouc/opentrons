@@ -1,28 +1,48 @@
-import assert from 'assert'
 // TODO: Ian 2019-04-18 move orderWells somewhere more general -- shared-data util?
 import min from 'lodash/min'
-import sortBy from 'lodash/sortBy'
 import {
   getTiprackVolume,
+  getLabwareDefURI,
   THERMOCYCLER_MODULE_TYPE,
   orderWells,
-  NozzleConfigurationStyle,
   COLUMN,
   ALL,
 } from '@opentrons/shared-data'
+import { COLUMN_4_SLOTS } from './constants'
 import type {
   InvariantContext,
   ModuleTemporalProperties,
   RobotState,
   ThermocyclerModuleState,
-} from './'
+} from './types'
+import type { NozzleConfigurationStyle } from '@opentrons/shared-data'
+
 export function sortLabwareBySlot(
   labwareState: RobotState['labware']
 ): string[] {
-  return sortBy<string>(Object.keys(labwareState), (id: string) =>
-    parseInt(labwareState[id].slot)
+  const sortedLabware = Object.keys(labwareState).sort(
+    (idA: string, idB: string) => {
+      const slotA = parseInt(labwareState[idA].slot)
+      const slotB = parseInt(labwareState[idB].slot)
+      if (
+        COLUMN_4_SLOTS.includes(labwareState[idA].slot) &&
+        COLUMN_4_SLOTS.includes(labwareState[idB].slot)
+      ) {
+        return idA.localeCompare(idB)
+      }
+      if (COLUMN_4_SLOTS.includes(labwareState[idA].slot)) {
+        return 1
+      }
+      if (COLUMN_4_SLOTS.includes(labwareState[idB].slot)) {
+        return -1
+      }
+      return slotA - slotB
+    }
   )
+
+  return sortedLabware
 }
+
 export function _getNextTip(args: {
   pipetteId: string
   tiprackId: string
@@ -56,7 +76,10 @@ export function _getNextTip(args: {
     return allWellsHaveTip ? orderedWells[0] : null
   }
 
-  assert(false, `Pipette ${pipetteId} has no channels/spec, cannot _getNextTip`)
+  console.assert(
+    false,
+    `Pipette ${pipetteId} has no channels/spec, cannot _getNextTip`
+  )
   return null
 }
 interface NextTiprackInfo {
@@ -68,6 +91,7 @@ interface NextTiprackInfo {
 }
 export function getNextTiprack(
   pipetteId: string,
+  tipRackUri: string,
   invariantContext: InvariantContext,
   robotState: RobotState,
   nozzles?: NozzleConfigurationStyle
@@ -88,16 +112,14 @@ export function getNextTiprack(
   // filter out unmounted or non-compatible tiprack models
   const sortedTipracksIds = sortLabwareBySlot(robotState.labware).filter(
     labwareId => {
-      assert(
+      console.assert(
         invariantContext.labwareEntities[labwareId]?.labwareDefURI,
         `cannot getNextTiprack, no labware entity for "${labwareId}"`
       )
       const isOnDeck = robotState.labware[labwareId].slot != null
-      return (
-        isOnDeck &&
-        pipetteEntity.tiprackDefURI ===
-          invariantContext.labwareEntities[labwareId]?.labwareDefURI
-      )
+      const labwareIdDefUri =
+        invariantContext.labwareEntities[labwareId].labwareDefURI
+      return isOnDeck && labwareIdDefUri === tipRackUri
     }
   )
   const is96Channel = pipetteEntity.spec.channels === 96
@@ -161,17 +183,25 @@ export function getNextTiprack(
 }
 export function getPipetteWithTipMaxVol(
   pipetteId: string,
-  invariantContext: InvariantContext
+  invariantContext: InvariantContext,
+  tipRackDefUri: string
 ): number {
   // NOTE: this fn assumes each pipette is assigned to exactly one tiprack type,
   // across the entire timeline
   const pipetteEntity = invariantContext.pipetteEntities[pipetteId]
-  const pipetteMaxVol = pipetteEntity.spec.maxVolume
+  const pipetteMaxVol = pipetteEntity.spec.liquids.default.maxVolume
   const tiprackDef = pipetteEntity.tiprackLabwareDef
-  const tiprackTipVol = getTiprackVolume(tiprackDef)
+  let chosenTipRack = null
+  for (const def of tiprackDef) {
+    if (getLabwareDefURI(def) === tipRackDefUri) {
+      chosenTipRack = def
+      break
+    }
+  }
+  const tiprackTipVol = getTiprackVolume(chosenTipRack ?? tiprackDef[0])
 
   if (!pipetteMaxVol || !tiprackTipVol) {
-    assert(
+    console.assert(
       false,
       `getPipetteEffectiveMaxVol expected tiprackMaxVol and pipette maxVolume to be > 0, got',
       ${pipetteMaxVol}, ${tiprackTipVol}`

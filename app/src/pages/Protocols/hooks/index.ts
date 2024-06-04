@@ -1,6 +1,5 @@
 import last from 'lodash/last'
 import {
-  useDeckConfigurationQuery,
   useInstrumentsQuery,
   useModulesQuery,
   useProtocolAnalysisAsDocumentQuery,
@@ -9,13 +8,19 @@ import {
 import {
   FLEX_ROBOT_TYPE,
   FLEX_SINGLE_SLOT_ADDRESSABLE_AREAS,
-  SINGLE_SLOT_FIXTURES,
   getCutoutIdForSlotName,
   getDeckDefFromRobotType,
+  getCutoutFixtureIdsForModuleModel,
+  getCutoutFixturesForModuleModel,
+  FLEX_MODULE_ADDRESSABLE_AREAS,
+  getModuleType,
+  FLEX_USB_MODULE_ADDRESSABLE_AREAS,
+  MAGNETIC_BLOCK_TYPE,
 } from '@opentrons/shared-data'
 import { getLabwareSetupItemGroups } from '../utils'
 import { getProtocolUsesGripper } from '../../../organisms/ProtocolSetupInstruments/utils'
 import { useDeckConfigurationCompatibility } from '../../../resources/deck_configuration/hooks'
+import { useNotifyDeckConfigurationQuery } from '../../../resources/deck_configuration'
 
 import type {
   CompletedProtocolAnalysis,
@@ -25,11 +30,11 @@ import type {
   PipetteName,
   ProtocolAnalysisOutput,
   RobotType,
+  RunTimeParameter,
 } from '@opentrons/shared-data'
 import type { LabwareSetupItem } from '../utils'
-import type { AttachedModule } from '@opentrons/api-client'
 
-interface ProtocolPipette {
+export interface ProtocolPipette {
   hardwareType: 'pipette'
   pipetteName: PipetteName
   mount: 'left' | 'right'
@@ -81,9 +86,10 @@ export const useRequiredProtocolHardwareFromAnalysis = (
 
   const robotType = FLEX_ROBOT_TYPE
   const deckDef = getDeckDefFromRobotType(robotType)
-  const { data: deckConfig = [] } = useDeckConfigurationQuery({
-    refetchInterval: DECK_CONFIG_REFETCH_INTERVAL,
-  })
+  const deckConfig =
+    useNotifyDeckConfigurationQuery({
+      refetchInterval: DECK_CONFIG_REFETCH_INTERVAL,
+    })?.data ?? []
   const deckConfigCompatibility = useDeckConfigurationCompatibility(
     robotType,
     analysis
@@ -104,33 +110,43 @@ export const useRequiredProtocolHardwareFromAnalysis = (
       ]
     : []
 
-  const handleModuleConnectionCheckFor = (
-    attachedModules: AttachedModule[],
-    model: ModuleModel
-  ): boolean => {
-    const ASSUME_ALWAYS_CONNECTED_MODULES = ['magneticBlockV1']
+  const requiredModules: ProtocolModule[] = analysis.modules
+    // remove magnetic blocks, they're handled by required fixtures
+    .filter(m => getModuleType(m.model) !== MAGNETIC_BLOCK_TYPE)
+    .map(({ location, model }) => {
+      const cutoutIdForSlotName = getCutoutIdForSlotName(
+        location.slotName,
+        deckDef
+      )
+      const moduleFixtures = getCutoutFixturesForModuleModel(model, deckDef)
 
-    return !ASSUME_ALWAYS_CONNECTED_MODULES.includes(model)
-      ? attachedModules.some(m => m.moduleModel === model)
-      : true
-  }
-
-  const requiredModules: ProtocolModule[] = analysis.modules.map(
-    ({ location, model }) => {
+      const configuredModuleSerialNumber =
+        deckConfig.find(
+          ({ cutoutId, cutoutFixtureId }) =>
+            cutoutId === cutoutIdForSlotName &&
+            moduleFixtures.map(mf => mf.id).includes(cutoutFixtureId)
+        )?.opentronsModuleSerialNumber ?? null
+      const isConnected = moduleFixtures.every(
+        mf => mf.expectOpentronsModuleSerialNumber
+      )
+        ? attachedModules.some(
+            m =>
+              m.moduleModel === model &&
+              m.serialNumber === configuredModuleSerialNumber
+          )
+        : true
       return {
         hardwareType: 'module',
         moduleModel: model,
         slot: location.slotName,
-        connected: handleModuleConnectionCheckFor(attachedModules, model),
+        connected: isConnected,
         hasSlotConflict: deckConfig.some(
           ({ cutoutId, cutoutFixtureId }) =>
             cutoutId === getCutoutIdForSlotName(location.slotName, deckDef) &&
-            cutoutFixtureId != null &&
-            !SINGLE_SLOT_FIXTURES.includes(cutoutFixtureId)
+            !getCutoutFixtureIdsForModuleModel(model).includes(cutoutFixtureId)
         ),
       }
-    }
-  )
+    })
 
   const requiredPipettes: ProtocolPipette[] = analysis.pipettes.map(
     ({ mount, pipetteName }) => ({
@@ -160,16 +176,23 @@ export const useRequiredProtocolHardwareFromAnalysis = (
     }
   )
 
-  const requiredFixtures = requiredDeckConfigCompatibility.map(
-    ({ cutoutFixtureId, cutoutId, compatibleCutoutFixtureIds }) => ({
+  const requiredFixtures = requiredDeckConfigCompatibility
+    // filter out all fixtures that only provide usb module addressable areas
+    // as they're handled in the requiredModules section via hardwareType === 'module'
+    .filter(
+      ({ requiredAddressableAreas }) =>
+        !requiredAddressableAreas.every(modAA =>
+          FLEX_USB_MODULE_ADDRESSABLE_AREAS.includes(modAA)
+        )
+    )
+    .map(({ cutoutFixtureId, cutoutId, compatibleCutoutFixtureIds }) => ({
       hardwareType: 'fixture' as const,
       cutoutFixtureId: compatibleCutoutFixtureIds[0],
       location: { cutout: cutoutId },
       hasSlotConflict:
         cutoutFixtureId != null &&
         !compatibleCutoutFixtureIds.includes(cutoutFixtureId),
-    })
-  )
+    }))
 
   return {
     requiredProtocolHardware: [
@@ -180,6 +203,26 @@ export const useRequiredProtocolHardwareFromAnalysis = (
     ],
     isLoading: isLoadingInstruments || isLoadingModules,
   }
+}
+
+/**
+ * Returns an array of RunTimeParameters objects that are optional by the given protocol ID.
+ *
+ * @param {string} protocolId The ID of the protocol for which required hardware is being retrieved.
+ * @returns {RunTimeParameters[]} An array of RunTimeParameters objects that are required by the given protocol ID.
+ */
+
+export const useRunTimeParameters = (
+  protocolId: string
+): RunTimeParameter[] => {
+  const { data: protocolData } = useProtocolQuery(protocolId)
+  const { data: analysis } = useProtocolAnalysisAsDocumentQuery(
+    protocolId,
+    last(protocolData?.data.analysisSummaries)?.id ?? null,
+    { enabled: protocolData != null }
+  )
+
+  return analysis?.runTimeParameters ?? []
 }
 
 /**
@@ -248,7 +291,6 @@ const useMissingProtocolHardwareFromRequiredProtocolHardware = (
     robotType,
     protocolAnalysis
   )
-
   // determine missing or conflicted hardware
   return {
     missingProtocolHardware: [
@@ -257,9 +299,16 @@ const useMissingProtocolHardwareFromRequiredProtocolHardware = (
       ),
       ...deckConfigCompatibility
         .filter(
-          ({ cutoutFixtureId, compatibleCutoutFixtureIds }) =>
+          ({
+            cutoutFixtureId,
+            compatibleCutoutFixtureIds,
+            requiredAddressableAreas,
+          }) =>
             cutoutFixtureId != null &&
-            !compatibleCutoutFixtureIds.some(id => id === cutoutFixtureId)
+            !compatibleCutoutFixtureIds.some(id => id === cutoutFixtureId) &&
+            !FLEX_MODULE_ADDRESSABLE_AREAS.some(modAA =>
+              requiredAddressableAreas.includes(modAA)
+            ) // modules are already included via requiredProtocolHardware
         )
         .map(({ compatibleCutoutFixtureIds, cutoutId }) => ({
           hardwareType: 'fixture' as const,

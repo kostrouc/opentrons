@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { useTranslation } from 'react-i18next'
 import { useDispatch, useSelector } from 'react-redux'
 import { makeBatchEditFieldProps } from './makeBatchEditFieldProps'
 import { NoBatchEditSharedSettings } from './NoBatchEditSharedSettings'
@@ -14,13 +15,15 @@ import {
   resetBatchEditFieldChanges,
   saveStepFormsMulti,
 } from '../../step-forms/actions'
-import { maskField, StepFieldName } from '../../steplist/fieldLevel'
+import { maskField } from '../../steplist/fieldLevel'
 import { BatchEditMoveLiquid } from './BatchEditMoveLiquid'
 import { BatchEditMix } from './BatchEditMix'
-import { ThunkDispatch } from 'redux-thunk'
-import { BaseState } from '../../types'
+import type { StepFieldName } from '../../steplist/fieldLevel'
+import type { ThunkDispatch } from 'redux-thunk'
+import type { BaseState } from '../../types'
 
 export const BatchEditForm = (): JSX.Element => {
+  const { t } = useTranslation('tooltip')
   const dispatch = useDispatch<ThunkDispatch<BaseState, any, any>>()
   const fieldValues = useSelector(getMultiSelectFieldValues)
   const stepTypes = useSelector(getBatchEditSelectedStepTypes)
@@ -48,7 +51,8 @@ export const BatchEditForm = (): JSX.Element => {
     const propsForFields = makeBatchEditFieldProps(
       fieldValues,
       disabledFields,
-      handleChangeFormInput
+      handleChangeFormInput,
+      t
     )
     switch (stepType) {
       case 'moveLiquid':

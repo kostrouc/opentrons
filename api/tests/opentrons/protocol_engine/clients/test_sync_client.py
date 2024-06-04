@@ -68,6 +68,23 @@ def test_add_labware_definition(
     assert result == expected_labware_uri
 
 
+def test_add_addressable_area(
+    decoy: Decoy,
+    transport: ChildThreadTransport,
+    subject: SyncClient,
+) -> None:
+    """It should add an addressable area."""
+    subject.add_addressable_area(addressable_area_name="cool-area")
+
+    decoy.verify(
+        transport.call_method(
+            "add_addressable_area",
+            addressable_area_name="cool-area",
+        ),
+        times=1,
+    )
+
+
 def test_add_liquid(
     decoy: Decoy,
     transport: ChildThreadTransport,
@@ -141,6 +158,30 @@ def test_load_labware(
         display_name="some_display_name",
     )
 
+    assert result == expected_result
+
+
+def test_reload_labware(
+    decoy: Decoy,
+    transport: ChildThreadTransport,
+    subject: SyncClient,
+) -> None:
+    """It should execute a reload labware command."""
+    expected_request = commands.ReloadLabwareCreate(
+        params=commands.ReloadLabwareParams(
+            labwareId="some-labware-id",
+        )
+    )
+
+    expected_result = commands.ReloadLabwareResult(
+        labwareId="some-labware-id", offsetId=None
+    )
+    decoy.when(transport.execute_command(request=expected_request)).then_return(
+        expected_result
+    )
+    result = subject.reload_labware(
+        labware_id="some-labware-id",
+    )
     assert result == expected_result
 
 

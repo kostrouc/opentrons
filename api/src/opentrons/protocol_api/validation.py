@@ -32,8 +32,7 @@ from opentrons.hardware_control.modules.types import (
     ThermocyclerStep,
 )
 
-from ._trash_bin import TrashBin
-from ._waste_chute import WasteChute
+from .disposal_locations import TrashBin, WasteChute
 
 if TYPE_CHECKING:
     from .labware import Well
@@ -86,6 +85,10 @@ class LabwareDefinitionIsNotLabwareError(ValueError):
 
 class InvalidTrashBinLocationError(ValueError):
     """An error raised when attempting to load trash bins in invalid slots."""
+
+
+class InvalidFixtureLocationError(ValueError):
+    """An error raised when attempting to load a fixture in an invalid cutout."""
 
 
 def ensure_mount_for_pipette(

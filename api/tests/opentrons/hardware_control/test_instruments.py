@@ -263,7 +263,7 @@ async def test_cache_instruments_sim(sim_and_instr):
         {types.Mount.LEFT: "p10_single", types.Mount.RIGHT: "p300_single_gen2"}
     )
     attached = sim.attached_instruments
-    assert attached[types.Mount.LEFT]["model"] == "p10_single_v1"
+    assert attached[types.Mount.LEFT]["model"] == "p10_single_v1.5"
     assert attached[types.Mount.LEFT]["name"] == "p10_single"
 
     steps_mm_calls = [mock.call({"B": 768}), mock.call({"C": 3200})]
@@ -291,7 +291,7 @@ async def test_cache_instruments_sim(sim_and_instr):
     # If we use prefixes, that should work too
     await sim.cache_instruments({types.Mount.RIGHT: "p300_single"})
     attached = sim.attached_instruments
-    assert attached[types.Mount.RIGHT]["model"] == "p300_single_v1"
+    assert attached[types.Mount.RIGHT]["model"] == "p300_single_v1.5"
     assert attached[types.Mount.RIGHT]["name"] == "p300_single"
     # If we specify instruments at init time, we should get them without
     # passing an expectation
@@ -538,6 +538,29 @@ async def test_no_pipette(sim_and_instr):
     with pytest.raises(types.PipetteNotAttachedError):
         await hw_api.aspirate(types.Mount.RIGHT, aspirate_ul, aspirate_rate)
         assert not hw_api._current_volume[types.Mount.RIGHT]
+
+
+async def test_tip_pickup_moves(sim_and_instr):
+    """Make sure that tip_pickup_moves does not add a tip to the instrument."""
+    sim_builder, (dummy_instruments, _) = sim_and_instr
+    hw_api = await sim_builder(
+        attached_instruments=dummy_instruments, loop=asyncio.get_running_loop()
+    )
+    mount = types.Mount.LEFT
+    await hw_api.home()
+    await hw_api.cache_instruments()
+
+    config = hw_api.get_config()
+
+    if config.model == "OT-2 Standard":
+        spec, _ = hw_api.plan_check_pick_up_tip(
+            mount=mount, tip_length=40.0, presses=None, increment=None
+        )
+        await hw_api.tip_pickup_moves(mount, spec)
+    else:
+        await hw_api.tip_pickup_moves(mount)
+
+    assert not hw_api.hardware_instruments[mount].has_tip
 
 
 async def test_pick_up_tip(is_robot, sim_and_instr):
