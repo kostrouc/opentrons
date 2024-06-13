@@ -1686,7 +1686,8 @@ class OT3API(
         # IMPORTANT: Here is our backlash compensation.
         #            The plunger is pre-loaded in the "aspirate" direction
         backlash_pos = target_pos.copy()
-        backlash_pos[pip_ax] += instrument.backlash_distance
+        # backlash_pos[pip_ax] += instrument.backlash_distance
+        backlash_pos[pip_ax] += 3.0
         # NOTE: plunger position (mm) decreases up towards homing switch
         # NOTE: if already at BOTTOM, we still need to run backlash-compensation movement,
         #       because we do not know if we arrived at BOTTOM from above or below.
