@@ -1669,7 +1669,7 @@ class OT3API(
         )
         pip_ax = Axis.of_main_tool_actuator(checked_mount)
         # speed depends on if there is a tip, and which direction to move
-        if instrument.has_tip:
+        if instrument.has_tip and False:
             # using slower aspirate flow-rate, to avoid pulling droplets up
             speed_up = self._pipette_handler.plunger_speed(
                 instrument, instrument.aspirate_flow_rate, "aspirate"
