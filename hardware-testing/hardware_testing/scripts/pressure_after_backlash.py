@@ -18,9 +18,13 @@ async def _main(is_simulating: bool) -> None:
     api = await helpers_ot3.build_async_ot3_hardware_api(is_simulating=is_simulating, pipette_left="p1000_96_v3.4")
     await api.home()
 
-    print("jog to pick-up-tip location")
-    await helpers_ot3.jog_mount_ot3(api, mount)
-    await api.pick_up_tip(mount, helpers_ot3.get_default_tip_length(50))
+    if "y" in input("attach tip? (y/n): ").lower():
+        print("jog to pick-up-tip location")
+        await helpers_ot3.jog_mount_ot3(api, mount)
+        await api.pick_up_tip(mount, helpers_ot3.get_default_tip_length(50))
+    else:
+        await api.add_tip(mount, helpers_ot3.get_default_tip_length(50))
+        await api.prepare_for_aspirate(mount)
     await api.retract(mount)
     print("jog to rubber pad")
     await helpers_ot3.jog_mount_ot3(api, mount)
@@ -33,7 +37,7 @@ async def _main(is_simulating: bool) -> None:
 
     # move up a bit, prepare for aspirate, then move back down
     await api.move_rel(mount, Point(z=HOVER_MM))
-    await api.prepare_for_aspirate(mount)
+    await api._move_to_plunger_bottom(mount, rate=1.0)
     await api.move_rel(mount, Point(z=-HOVER_MM))
 
     # NOTE: re-setting the gantry-load will reset the move-manager's per-axis constraints
