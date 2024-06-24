@@ -868,7 +868,7 @@ async def _test_diagnostics_environment(
         env_sensor = ENVIRONMENT_SENSOR.get_reading()
         
         #print("Air temperature and humidity",env_sensor)
-        LOG_GING.info("Air temperature and humidity",env_sensor)    
+        LOG_GING.info("Air temperature and humidity={}".format(env_sensor))    
         room_celsius = env_sensor.temperature#_get_room_celsius()
         room_humidity =env_sensor.relative_humidity #_get_room_humidity()
     else:
@@ -1258,7 +1258,7 @@ async def _test_diagnostics_pressure(
         current_pos = await api.gantry_position(mount)
         await api.move_to(mount, slot_5_pos._replace(y=slot_5_pos.y+29,z=current_pos.z))
         await api.move_rel(mount, Point(z=movez))
-    await asyncio.sleep(0.2)
+    await asyncio.sleep(1)
     for sensor_id in sensor_ids:
         pressure = await _read_pressure(sensor_id)
         #print(f"pressure-sealed: {pressure}")
