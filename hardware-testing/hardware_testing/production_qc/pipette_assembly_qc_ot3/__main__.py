@@ -1245,6 +1245,8 @@ async def _test_diagnostics_pressure(
     await _pick_up_tip_for_tip_volume(api, mount, tip_volume=50)
     await api.retract(mount)
 
+    input("Test1")
+
     # SEALED PRESSURE
     current_pos = await api.gantry_position(mount)
 
@@ -1259,6 +1261,7 @@ async def _test_diagnostics_pressure(
         await api.move_to(mount, slot_5_pos._replace(y=slot_5_pos.y+29,z=current_pos.z))
         await api.move_rel(mount, Point(z=movez))
     await asyncio.sleep(1)
+    input("Test1")
     for sensor_id in sensor_ids:
         pressure = await _read_pressure(sensor_id)
         #print(f"pressure-sealed: {pressure}")
@@ -1320,6 +1323,8 @@ async def _test_diagnostics_pressure(
             ]
         )
     #print("moving plunger back down to BOTTOM position")
+    await asyncio.sleep(1)
+    input("Test1")
     LOG_GING.info("moving plunger back down to BOTTOM position")
     await api.dispense(mount)
     await api.prepare_for_aspirate(mount)
