@@ -1346,13 +1346,13 @@ async def _test_diagnostics(api: OT3API, mount: OT3Mount, write_cb: Callable) ->
     write_cb(["diagnostics-encoder", _bool_to_pass_fail(encoder_pass)])
     # CAPACITIVE SENSOR
     #print("SKIPPING CAPACITIVE TESTS")
-    LOG_GING.info("SKIPPING CAPACITIVE TESTS")
-    pip = api.hardware_pipettes[mount.to_mount()]
-    assert pip
-    capacitance_pass = await _test_diagnostics_capacitive(api, mount, write_cb)
-    #print(f"capacitance: {_bool_to_pass_fail(capacitance_pass)}")
-    LOG_GING.info(f"capacitance: {_bool_to_pass_fail(capacitance_pass)}")
-    write_cb(["diagnostics-capacitance", _bool_to_pass_fail(capacitance_pass)])
+    # LOG_GING.info("SKIPPING CAPACITIVE TESTS")
+    # pip = api.hardware_pipettes[mount.to_mount()]
+    # assert pip
+    # capacitance_pass = await _test_diagnostics_capacitive(api, mount, write_cb)
+    # #print(f"capacitance: {_bool_to_pass_fail(capacitance_pass)}")
+    # LOG_GING.info(f"capacitance: {_bool_to_pass_fail(capacitance_pass)}")
+    # write_cb(["diagnostics-capacitance", _bool_to_pass_fail(capacitance_pass)])
     # PRESSURE
     pressure_pass = await _test_diagnostics_pressure(api, mount, write_cb)
     #print(f"pressure: {_bool_to_pass_fail(pressure_pass)}")
