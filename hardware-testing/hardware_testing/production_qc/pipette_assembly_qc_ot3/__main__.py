@@ -673,8 +673,8 @@ async def _fixture_check_pressure(
     # insert into the fixture
     # NOTE: unknown amount of pressure here (depends on where Z was calibrated)
     fixture_depth = PRESSURE_FIXTURE_INSERT_DEPTH[pip_vol]
-    await api.move_rel(mount, Point(z=-fixture_depth),speed=10)
-    await asyncio.sleep(1)
+    await api.move_rel(mount, Point(z=-fixture_depth))
+    await asyncio.sleep(2)
     r, inserted_pressure_data = await _read_pressure_and_check_results(
         api,
         pip_channels,
@@ -686,9 +686,10 @@ async def _fixture_check_pressure(
         pip_channels,
     )
     results.append(r)
+    await asyncio.sleep(2)
     # aspirate 50uL
     await api.aspirate(mount, PRESSURE_FIXTURE_ASPIRATE_VOLUME[pip_vol])
-    await asyncio.sleep(1)
+    await asyncio.sleep(2)
     if pip_vol == 50:
         asp_evt = PressureEvent.ASPIRATE_P50
     else:
