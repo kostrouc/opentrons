@@ -1196,7 +1196,7 @@ async def _test_diagnostics_pressure(
             
     elif "p1000" in pipptype[OT3Mount.LEFT]['name']:
         CHTYPE_PIPPETE = 1000
-        movez = -117.8
+        movez = -117
 
         # if "single" in pipptype[OT3Mount.LEFT]['name']:  
         #     current_val = PRESSURE_THRESH_current[pip_channels][CHTYPE_PIPPETE][1]
