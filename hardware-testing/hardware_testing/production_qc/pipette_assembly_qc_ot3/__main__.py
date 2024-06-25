@@ -1196,7 +1196,7 @@ async def _test_diagnostics_pressure(
             
     elif "p1000" in pipptype[OT3Mount.LEFT]['name']:
         CHTYPE_PIPPETE = 1000
-        movez = -117.86
+        movez = -117.8
 
         # if "single" in pipptype[OT3Mount.LEFT]['name']:  
         #     current_val = PRESSURE_THRESH_current[pip_channels][CHTYPE_PIPPETE][1]
@@ -1252,12 +1252,14 @@ async def _test_diagnostics_pressure(
         slot_5_pos = helpers_ot3.get_slot_calibration_square_position_ot3(11)
         current_pos = await api.gantry_position(mount)
         await api.move_to(mount, slot_5_pos._replace(z=current_pos.z))
-        await api.move_rel(mount, Point(z=movez),speed=10)
+        await api.move_rel(mount, Point(z=movez+10))
+        await api.move_rel(mount, Point(z=10),speed=5)
     elif "multi" in pipptype[OT3Mount.LEFT]['name']:
         slot_5_pos = helpers_ot3.get_slot_calibration_square_position_ot3(11)
         current_pos = await api.gantry_position(mount)
         await api.move_to(mount, slot_5_pos._replace(y=slot_5_pos.y+29,z=current_pos.z))
-        await api.move_rel(mount, Point(z=movez),speed=10)
+        await api.move_rel(mount, Point(z=movez+10))
+        await api.move_rel(mount, Point(z=10),speed=5)
     await asyncio.sleep(0.2)
     for sensor_id in sensor_ids:
         pressure = await _read_pressure(sensor_id)
