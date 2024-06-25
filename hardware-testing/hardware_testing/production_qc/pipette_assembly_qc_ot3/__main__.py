@@ -673,7 +673,7 @@ async def _fixture_check_pressure(
     # insert into the fixture
     # NOTE: unknown amount of pressure here (depends on where Z was calibrated)
     fixture_depth = PRESSURE_FIXTURE_INSERT_DEPTH[pip_vol]
-    await api.move_rel(mount, Point(z=-fixture_depth),speed=5)
+    await api.move_rel(mount, Point(z=-fixture_depth),speed=3)
     await asyncio.sleep(1)
     r, inserted_pressure_data = await _read_pressure_and_check_results(
         api,
