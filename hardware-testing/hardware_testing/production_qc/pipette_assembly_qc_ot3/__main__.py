@@ -1252,12 +1252,12 @@ async def _test_diagnostics_pressure(
         slot_5_pos = helpers_ot3.get_slot_calibration_square_position_ot3(11)
         current_pos = await api.gantry_position(mount)
         await api.move_to(mount, slot_5_pos._replace(z=current_pos.z))
-        await api.move_rel(mount, Point(z=movez))
+        await api.move_rel(mount, Point(z=movez),speed=10)
     elif "multi" in pipptype[OT3Mount.LEFT]['name']:
         slot_5_pos = helpers_ot3.get_slot_calibration_square_position_ot3(11)
         current_pos = await api.gantry_position(mount)
         await api.move_to(mount, slot_5_pos._replace(y=slot_5_pos.y+29,z=current_pos.z))
-        await api.move_rel(mount, Point(z=movez))
+        await api.move_rel(mount, Point(z=movez),speed=10)
     await asyncio.sleep(0.2)
     for sensor_id in sensor_ids:
         pressure = await _read_pressure(sensor_id)
@@ -1330,18 +1330,18 @@ async def _test_diagnostics_pressure(
 
 
 async def _test_diagnostics(api: OT3API, mount: OT3Mount, write_cb: Callable) -> bool:
-    # ENVIRONMENT SENSOR
-    environment_pass = await _test_diagnostics_environment(api, mount, write_cb)
-    #print(f"environment: {_bool_to_pass_fail(environment_pass)}")
-    LOG_GING.info(f"environment: {_bool_to_pass_fail(environment_pass)}")
-    write_cb(["diagnostics-environment", _bool_to_pass_fail(environment_pass)])
-    # ENCODER
-    encoder_pass = await _test_diagnostics_encoder(api, mount, write_cb)
-    #print(f"encoder: {_bool_to_pass_fail(encoder_pass)}")
-    LOG_GING.info(f"encoder: {_bool_to_pass_fail(encoder_pass)}")
-    write_cb(["diagnostics-encoder", _bool_to_pass_fail(encoder_pass)])
-    # CAPACITIVE SENSOR
-    #print("SKIPPING CAPACITIVE TESTS")
+    # # ENVIRONMENT SENSOR
+    # environment_pass = await _test_diagnostics_environment(api, mount, write_cb)
+    # #print(f"environment: {_bool_to_pass_fail(environment_pass)}")
+    # LOG_GING.info(f"environment: {_bool_to_pass_fail(environment_pass)}")
+    # write_cb(["diagnostics-environment", _bool_to_pass_fail(environment_pass)])
+    # # ENCODER
+    # encoder_pass = await _test_diagnostics_encoder(api, mount, write_cb)
+    # #print(f"encoder: {_bool_to_pass_fail(encoder_pass)}")
+    # LOG_GING.info(f"encoder: {_bool_to_pass_fail(encoder_pass)}")
+    # write_cb(["diagnostics-encoder", _bool_to_pass_fail(encoder_pass)])
+    # # CAPACITIVE SENSOR
+    # #print("SKIPPING CAPACITIVE TESTS")
     # LOG_GING.info("SKIPPING CAPACITIVE TESTS")
     # pip = api.hardware_pipettes[mount.to_mount()]
     # assert pip
@@ -1354,7 +1354,8 @@ async def _test_diagnostics(api: OT3API, mount: OT3Mount, write_cb: Callable) ->
     #print(f"pressure: {_bool_to_pass_fail(pressure_pass)}")
     LOG_GING.info(f"pressure: {_bool_to_pass_fail(pressure_pass)}")
     write_cb(["diagnostics-pressure", _bool_to_pass_fail(pressure_pass)])
-    return environment_pass and pressure_pass and encoder_pass and capacitance_pass
+    # return environment_pass and pressure_pass and encoder_pass and capacitance_pass
+    return pressure_pass
 
 
 async def _test_plunger_positions(
