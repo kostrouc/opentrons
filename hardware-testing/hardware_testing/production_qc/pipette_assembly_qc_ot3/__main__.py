@@ -673,7 +673,7 @@ async def _fixture_check_pressure(
     # insert into the fixture
     # NOTE: unknown amount of pressure here (depends on where Z was calibrated)
     fixture_depth = PRESSURE_FIXTURE_INSERT_DEPTH[pip_vol]
-    await api.move_rel(mount, Point(z=-fixture_depth))
+    await api.move_rel(mount, Point(z=-fixture_depth),speed=5)
     await asyncio.sleep(1)
     r, inserted_pressure_data = await _read_pressure_and_check_results(
         api,
@@ -1332,25 +1332,25 @@ async def _test_diagnostics_pressure(
 
 
 async def _test_diagnostics(api: OT3API, mount: OT3Mount, write_cb: Callable) -> bool:
-    # # ENVIRONMENT SENSOR
-    # environment_pass = await _test_diagnostics_environment(api, mount, write_cb)
-    # #print(f"environment: {_bool_to_pass_fail(environment_pass)}")
-    # LOG_GING.info(f"environment: {_bool_to_pass_fail(environment_pass)}")
-    # write_cb(["diagnostics-environment", _bool_to_pass_fail(environment_pass)])
-    # # ENCODER
-    # encoder_pass = await _test_diagnostics_encoder(api, mount, write_cb)
-    # #print(f"encoder: {_bool_to_pass_fail(encoder_pass)}")
-    # LOG_GING.info(f"encoder: {_bool_to_pass_fail(encoder_pass)}")
-    # write_cb(["diagnostics-encoder", _bool_to_pass_fail(encoder_pass)])
-    # # CAPACITIVE SENSOR
-    # #print("SKIPPING CAPACITIVE TESTS")
-    # LOG_GING.info("SKIPPING CAPACITIVE TESTS")
-    # pip = api.hardware_pipettes[mount.to_mount()]
-    # assert pip
-    # capacitance_pass = await _test_diagnostics_capacitive(api, mount, write_cb)
-    # #print(f"capacitance: {_bool_to_pass_fail(capacitance_pass)}")
-    # LOG_GING.info(f"capacitance: {_bool_to_pass_fail(capacitance_pass)}")
-    # write_cb(["diagnostics-capacitance", _bool_to_pass_fail(capacitance_pass)])
+    # ENVIRONMENT SENSOR
+    environment_pass = await _test_diagnostics_environment(api, mount, write_cb)
+    #print(f"environment: {_bool_to_pass_fail(environment_pass)}")
+    LOG_GING.info(f"environment: {_bool_to_pass_fail(environment_pass)}")
+    write_cb(["diagnostics-environment", _bool_to_pass_fail(environment_pass)])
+    # ENCODER
+    encoder_pass = await _test_diagnostics_encoder(api, mount, write_cb)
+    #print(f"encoder: {_bool_to_pass_fail(encoder_pass)}")
+    LOG_GING.info(f"encoder: {_bool_to_pass_fail(encoder_pass)}")
+    write_cb(["diagnostics-encoder", _bool_to_pass_fail(encoder_pass)])
+    # CAPACITIVE SENSOR
+    #print("SKIPPING CAPACITIVE TESTS")
+    LOG_GING.info("SKIPPING CAPACITIVE TESTS")
+    pip = api.hardware_pipettes[mount.to_mount()]
+    assert pip
+    capacitance_pass = await _test_diagnostics_capacitive(api, mount, write_cb)
+    #print(f"capacitance: {_bool_to_pass_fail(capacitance_pass)}")
+    LOG_GING.info(f"capacitance: {_bool_to_pass_fail(capacitance_pass)}")
+    write_cb(["diagnostics-capacitance", _bool_to_pass_fail(capacitance_pass)])
     # PRESSURE
     pressure_pass = await _test_diagnostics_pressure(api, mount, write_cb)
     #print(f"pressure: {_bool_to_pass_fail(pressure_pass)}")
