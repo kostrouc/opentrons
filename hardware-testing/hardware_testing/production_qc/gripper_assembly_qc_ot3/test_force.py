@@ -19,7 +19,7 @@ from hardware_testing.opentrons_api import helpers_ot3
 from hardware_testing.opentrons_api.types import Axis, OT3Mount, Point
 
 
-SLOT_FORCE_GAUGE = 4
+SLOT_FORCE_GAUGE = 5
 
 GRIP_DUTY_CYCLES: List[int] = [40, 30, 25, 20, 15, 10, 6]
 NUM_DUTY_CYCLE_TRIALS = 20
