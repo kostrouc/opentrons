@@ -204,10 +204,10 @@ def run(protocol: protocol_api.ProtocolContext, tiprack: str, removal: int) -> N
     for i in list(range(1)):
         for column in tiprack_columns:
             pleft.pick_up_tip(tiprack_1[column])
-            pleft.aspirate(50, reservoir[column])
-            print("aspirated")
-            pleft.dispense(50, pcr_plate[column])
-            print("dispensed")
+            # pleft.aspirate(50, reservoir[column])
+            # print("aspirated")
+            # pleft.dispense(50, pcr_plate[column])
+            # print("dispensed")
             #pleft.move_to(trash_bin)
             hw_api.move_to(Mount.LEFT, Point(400,410,330))
             # consider using tip size var to make it scale
