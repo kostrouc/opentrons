@@ -176,7 +176,7 @@ def _run_trial(trial: PhotometricTrial) -> None:
 
     ui.print_info(f"aspirating from {trial.source}")
     _record_measurement_and_store(MeasurementType.INIT)
-    trial.pipette.move_to(location=trial.source.top(), minimum_z_height=133)
+    trial.pipette.move_to(location=trial.source.top(), minimum_z_height=143)
     # RUN ASPIRATE
     aspirate_with_liquid_class(
         trial.ctx,
