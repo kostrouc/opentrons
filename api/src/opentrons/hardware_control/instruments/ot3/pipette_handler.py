@@ -1,4 +1,5 @@
 """Shared code for managing pipette configuration and storage."""
+from opentrons.types import Point
 from dataclasses import dataclass
 import logging
 from typing import (
@@ -936,7 +937,7 @@ class OT3PipetteHandler:
         #removal method two
         shakes: List[Tuple[Point, Optional[float]]] = []
         if removal == 2:
-            return
+            print("pls work")
         #     shake_distance = 5
         #     for i in range(5):
         #         shakes.extend(

@@ -133,7 +133,7 @@ async def _main(simulate: bool, tiprack: str, removal: int):
             break
         except:
             print("failed to find")
-            await asyncio.sleep(1)
+            await asyncio.sleep(2)
     run(protocol, tiprack, removal)
 
 # from datetime we get our runtime
@@ -208,14 +208,14 @@ def run(protocol: protocol_api.ProtocolContext, tiprack: str, removal: int) -> N
             print("aspirated")
             pleft.dispense(50, pcr_plate[column])
             print("dispensed")
-            #pleft.move_to(trash_bin)
-            hw_api.move_to(Mount.LEFT, Point(400,410,330))
+            hw_api.move_to(Mount.LEFT, Point(405,395,200))
+            hw_api.move_to(Mount.LEFT, Point(405,395,7))
             # consider using tip size var to make it scale
             print("104030")
             hw_api.drop_tip(mount=Mount.LEFT, removal=removal)
             print("new one")
             if removal == 2:
-                hw_api.move_to(Mount.LEFT, Point(370,410,330), speed = 5)
+                hw_api.move_to(Mount.LEFT, Point(380,395,65), speed = 5)
     protocol.home()
     pleft.home()
 
