@@ -111,6 +111,37 @@ async def _main(simulate: bool, tiprack: str, removal: int):
         pipette_serial = pipette_data["left"].get("id", "")
         print("15")
 
+    #store most data in case of unsuccessful run
+        row = [
+            remove_type,
+            str(new_timestamp),
+            args.tip_type,
+            "",  # will only write if it is not removed, IE will be blank unless the run fails. LATER
+            "", #not occured yet
+            temp,
+            rh,
+            soft,
+            firm,
+            pipette_serial,
+            rob_serial,
+            "",  # static occur? need to input manually
+        ]
+        print("help?")
+        # write to google sheet
+        try:
+            if google_sheet.credentials.access_token_expired:
+                google_sheet.gc.login()
+            google_sheet.write_header(header)
+            google_sheet.update_row_index()
+            google_sheet.write_to_row(row)
+            print("Wrote row")
+        except RuntimeError:
+            print("Did not write row.")
+        # hopefully this writes to the google sheet
+        print("help")
+
+
+
         LABWARE_OFFSETS.extend(workarounds.http_get_all_labware_offsets())
     print(f"simulate {simulate}")
     protocol = helpers.get_api_context(
@@ -138,34 +169,7 @@ async def _main(simulate: bool, tiprack: str, removal: int):
 
 # from datetime we get our runtime
     tot_run_time = int(time.time() - start)
-
-    row = [
-        remove_type,
-        str(new_timestamp),
-        args.tip_type,
-        "",  # will only write if it is not removed, IE will be blank unless the run fails. LATER
-        tot_run_time,
-        temp,
-        rh,
-        soft,
-        firm,
-        pipette_serial,
-        rob_serial,
-        "",  # static occur? need to input manually
-    ]
-    print("16")
-    # write to google sheet
-    try:
-        if google_sheet.credentials.access_token_expired:
-            google_sheet.gc.login()
-        google_sheet.write_header(header)
-        google_sheet.update_row_index()
-        google_sheet.write_to_row(row)
-        print("Wrote row")
-    except RuntimeError:
-        print("Did not write row.")
-    # hopefully this writes to the google sheet
-    print("17")
+    print(tot_run_time)
 
 def run(protocol: protocol_api.ProtocolContext, tiprack: str, removal: int) -> None:
 
@@ -201,21 +205,21 @@ def run(protocol: protocol_api.ProtocolContext, tiprack: str, removal: int) -> N
     pleft.home()
     hw_api = get_sync_hw_api(protocol)
     print("10")
-    for i in list(range(1)):
-        for column in tiprack_columns:
-            pleft.pick_up_tip(tiprack_1[column])
-            pleft.aspirate(50, reservoir[column])
-            print("aspirated")
-            pleft.dispense(50, pcr_plate[column])
-            print("dispensed")
-            hw_api.move_to(Mount.LEFT, Point(405,395,200))
-            hw_api.move_to(Mount.LEFT, Point(405,395,7))
-            # consider using tip size var to make it scale
-            print("104030")
-            hw_api.drop_tip(mount=Mount.LEFT, removal=removal)
-            print("new one")
-            if removal == 2:
-                hw_api.move_to(Mount.LEFT, Point(380,395,65), speed = 5)
+    for column in tiprack_columns:
+        pleft.pick_up_tip(tiprack_1[column])
+        pleft.aspirate(50, reservoir[column])
+        print("aspirated")
+        pleft.dispense(50, pcr_plate[column])
+        print("dispensed")
+        hw_api.move_to(Mount.LEFT, Point(405,395,200))
+        hw_api.move_to(Mount.LEFT, Point(405,395,7))
+        # consider using tip size var to make it scale
+        print("104030")
+        hw_api.drop_tip(mount=Mount.LEFT, removal=removal)
+        print("new one")
+        if removal == 2:
+            hw_api.move_to(Mount.LEFT, Point(380,395,60), speed = 5)
+        pleft.home()
     protocol.home()
     pleft.home()
 
