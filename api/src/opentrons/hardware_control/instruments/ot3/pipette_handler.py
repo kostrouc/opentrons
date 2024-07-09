@@ -938,21 +938,6 @@ class OT3PipetteHandler:
         shakes: List[Tuple[Point, Optional[float]]] = []
         if removal == 2:
             print("pls work")
-        #     shake_distance = 5
-        #     for i in range(5):
-        #         shakes.extend(
-        #             [
-        #                 (Point(shake_distance, 0, 0), 10.0),
-        #                 (Point(-1 * shake_distance, 0, 0), 10.0),
-        #             ]
-        #         )
-        # else: 
-        #     shakes.extend(
-        #         [
-        #         (Point(0,0,0),None),
-        #         ]
-        #     )
-
 
         return TipActionSpec(
             tip_action_moves=drop_seq,

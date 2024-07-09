@@ -212,13 +212,13 @@ def run(protocol: protocol_api.ProtocolContext, tiprack: str, removal: int) -> N
         pleft.dispense(50, pcr_plate[column])
         print("dispensed")
         hw_api.move_to(Mount.LEFT, Point(405,395,200))
-        hw_api.move_to(Mount.LEFT, Point(405,395,7))
+        hw_api.move_to(Mount.LEFT, Point(405,395,12))
         # consider using tip size var to make it scale
         print("104030")
         hw_api.drop_tip(mount=Mount.LEFT, removal=removal)
         print("new one")
         if removal == 2:
-            hw_api.move_to(Mount.LEFT, Point(380,395,60), speed = 5)
+            hw_api.move_to(Mount.LEFT, Point(380,395,65), speed = 5)
         pleft.home()
     protocol.home()
     pleft.home()
