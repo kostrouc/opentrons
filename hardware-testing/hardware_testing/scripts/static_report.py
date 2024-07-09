@@ -100,7 +100,7 @@ async def _main(simulate: bool, tiprack: str, removal: int):
         print("13")
         health_data = response.json()
         firm = health_data.get("fw_version", "")
-        soft = health_data.get("system_version", "")
+        soft = health_data.get("api_version", "")
         rob_serial = health_data.get("robot_serial", "")
         print("14")
         # from instruments we get pipette serial
@@ -211,14 +211,18 @@ def run(protocol: protocol_api.ProtocolContext, tiprack: str, removal: int) -> N
         print("aspirated")
         pleft.dispense(50, pcr_plate[column])
         print("dispensed")
-        hw_api.move_to(Mount.LEFT, Point(405,395,200))
-        hw_api.move_to(Mount.LEFT, Point(405,395,12))
+        x_pos = 405
+        if removal == 2:
+            x_pos = 330
+        hw_api.move_to(Mount.LEFT, Point(x_pos,395,200)) 
+        #405 for tape, 330 for bin
+        hw_api.move_to(Mount.LEFT, Point(x_pos,395,12))
         # consider using tip size var to make it scale
         print("104030")
         hw_api.drop_tip(mount=Mount.LEFT, removal=removal)
         print("new one")
         if removal == 2:
-            hw_api.move_to(Mount.LEFT, Point(380,395,65), speed = 5)
+            hw_api.move_to(Mount.LEFT, Point(x_pos - 20,395,63), speed = 5) #was 380 for tape
         pleft.home()
     protocol.home()
     pleft.home()
