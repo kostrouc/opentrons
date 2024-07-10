@@ -429,6 +429,7 @@ async def liquid_probe(
     p_pass_distance = float(max_p_distance - p_prep_distance)
     max_z_distance = (p_pass_distance / plunger_speed) * mount_speed
 
+    # what happens here if the tip is blocked or inside liquid?
     lower_plunger = create_step(
         distance={tool: float64(p_prep_distance)},
         velocity={tool: float64(plunger_speed)},
