@@ -6,6 +6,7 @@ import asyncio
 from opentrons import protocol_api
 from hardware_testing.drivers import asair_sensor
 from hardware_testing.gravimetric import helpers, workarounds
+from hardware_testing.opentrons_api import helpers_ot3
 from opentrons.protocol_engine.types import LabwareOffset
 import datetime
 import requests
@@ -58,7 +59,6 @@ async def _main(simulate: bool, tiprack: str, removal: int):
             "Firmware",
             "Pipette Serial",
             "Robot Serial",
-            "Static Occured?",
         ]
         # Upload to google has passed
         try:
@@ -124,7 +124,6 @@ async def _main(simulate: bool, tiprack: str, removal: int):
             firm,
             pipette_serial,
             rob_serial,
-            "",  # static occur? need to input manually
         ]
         print("help?")
         # write to google sheet
@@ -154,6 +153,7 @@ async def _main(simulate: bool, tiprack: str, removal: int):
         engine.state_view._labware_store._add_labware_offset(offset)
 
     hw_api = get_sync_hw_api(protocol)
+    helpers_ot3.restart_server_ot3()
     for i in range(25):
         hw_api.cache_instruments(require={Mount.LEFT: "p1000_multi_flex"})
         attached = hw_api.attached_pipettes

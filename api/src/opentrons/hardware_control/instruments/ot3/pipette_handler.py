@@ -914,7 +914,7 @@ class OT3PipetteHandler:
                     },
                 ),
             )   
-            for i in range(5):
+            for i in range(3):
                 drop_seq.extend(    
                     [
                         TipActionMoveSpec(
