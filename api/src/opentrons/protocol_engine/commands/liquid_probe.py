@@ -89,6 +89,8 @@ class LiquidProbeImplementation(AbstractCommandImpl[LiquidProbeParams, _ExecuteR
         # get_is_ready_to_aspirate as an indirect way to throw a TipNotAttachedError if appropriate
         self._pipetting.get_is_ready_to_aspirate(pipette_id=pipette_id)
 
+        # will we check if tip is DRY ?
+
         if self._pipetting.get_is_empty(pipette_id=pipette_id) is False:
             raise TipNotEmptyError(
                 message="This operation requires a tip with no liquid in it."

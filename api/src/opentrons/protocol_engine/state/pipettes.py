@@ -641,9 +641,9 @@ class PipetteView(HasState[PipetteState]):
         if (
             lld_settings is None
             or lld_settings[tipVolume] is None
-            or lld_settings[tipVolume]["minHeight"] is None
+            or lld_settings[tipVolume]["minHeight"] is None  # where is this stored?
         ):
-            return 0
+            return 0  # can we make the default 0.5mm ?
         return float(lld_settings[tipVolume]["minHeight"])
 
     def validate_tip_state(self, pipette_id: str, expected_has_tip: bool) -> None:

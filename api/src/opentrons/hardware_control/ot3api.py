@@ -2636,15 +2636,16 @@ class OT3API(
         pos = await self.gantry_position(checked_mount, refresh=True)
         while (probe_start_pos.z - pos.z) < max_z_dist:
             # safe distance so we don't accidentally aspirate liquid if we're already close to liquid
+            # can we configure these two variables somewhere? (SAFE-HEIGHT-MM and OVERLAP-MM)
             safe_plunger_pos = pos._replace(z=(pos.z + 2))
             # overlap amount we want to use between passes
-            pass_start_pos = pos._replace(z=(pos.z + 0.5))
+            pass_start_pos = pos._replace(z=(pos.z + 0.5))  # can we skip this on 1st pass?
 
             # Prep the plunger
             await self.move_to(checked_mount, safe_plunger_pos)
             if probe_settings.aspirate_while_sensing:
                 # TODO(cm, 7/8/24): remove p_prep_speed from the rate at some point
-                await self._move_to_plunger_bottom(checked_mount, rate=p_prep_speed)
+                await self._move_to_plunger_bottom(checked_mount, rate=p_prep_speed)  # "speed" is not "rate"
             else:
                 await self._move_to_plunger_top(checked_mount, rate=p_prep_speed)
 
