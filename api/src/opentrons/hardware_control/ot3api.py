@@ -2639,6 +2639,7 @@ class OT3API(
             # can we configure these two variables somewhere? (SAFE-HEIGHT-MM and OVERLAP-MM)
             safe_plunger_pos = pos._replace(z=(pos.z + 2))
             # overlap amount we want to use between passes
+            # also includes the ~0.something mm "moving" baseline
             pass_start_pos = pos._replace(z=(pos.z + 0.5))  # can we skip this on 1st pass?
 
             # Prep the plunger
