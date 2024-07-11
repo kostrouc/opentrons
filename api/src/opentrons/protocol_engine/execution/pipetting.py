@@ -178,12 +178,14 @@ class HardwarePipettingHandler(PipettingHandler):
         well_name: str,
     ) -> float:
         """Detect liquid level."""
+        # We call this from protocol_engine/commands/liquid_probe.py,
+        # and we depend on that layer to ensure we are currently at a well.top
+        # if you want to use this as part of another command you must also ensure this
         hw_pipette = self._state_view.pipettes.get_hardware_pipette(
             pipette_id=pipette_id,
             attached_pipettes=self._hardware_api.attached_instruments,
         )
         well_def = self._state_view.labware.get_well_definition(labware_id, well_name)
-        # does this work if current position is NOT exactly top of well?
         well_depth = well_def.depth
         lld_min_height = self._state_view.pipettes.get_current_tip_lld_settings(
             pipette_id=pipette_id
