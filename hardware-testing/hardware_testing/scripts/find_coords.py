@@ -97,7 +97,7 @@ def run(protocol: protocol_api.ProtocolContext, tiprack: str, removal: int) -> N
     hw_api = get_sync_hw_api(protocol)
     print("10")
     
-    hw_api.move_to(Mount.LEFT, Point(327,25,220))
+    hw_api.move_to(Mount.LEFT, Point(327,25,200))
 
     for i in list(range(100)):
         #Limits are 455,416,250

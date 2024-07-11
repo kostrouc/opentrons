@@ -37,7 +37,7 @@ except ImportError:
     pass
 
 
-async def _main(simulate: bool, tiprack: str, removal: int):
+async def _main(simulate: bool, tiprack: str, removal: int, tip_location: int, tip_type: int):
     print("3")
     if not simulate:
         print("4")
@@ -176,7 +176,7 @@ async def _main(simulate: bool, tiprack: str, removal: int):
         except:
             print("failed to find")
             await asyncio.sleep(2)
-    run(protocol, tiprack, removal)
+    run(protocol, tiprack, removal, tip_location, tip_type)
 
 def run(protocol: protocol_api.ProtocolContext, tiprack: str, removal: int, tip_location: int, tip_type: int) -> None:
 
@@ -217,7 +217,7 @@ def run(protocol: protocol_api.ProtocolContext, tiprack: str, removal: int, tip_
     if tip_type == 50 or tip_type == 200:
         adjustment = 51
     if tip_type == 1000:
-        adjustment = 90
+        adjustment = 93
     x_pos = 400
     y_pos = 395
     z_pos = -5
@@ -238,7 +238,7 @@ def run(protocol: protocol_api.ProtocolContext, tiprack: str, removal: int, tip_
         pleft.pick_up_tip(tiprack_1[column])
         hw_api.move_rel(Mount.LEFT, Point(0,0,120)) #make it go up out of tiprack to avoid collision
         
-        hw_api.move_to(Mount.LEFT, Point(x_pos,y_pos,220)) #200 is subject to change
+        hw_api.move_to(Mount.LEFT, Point(x_pos,y_pos,140)) #200 is subject to change
         #405 for tape, 330 for bin
         hw_api.move_to(Mount.LEFT, Point(x_pos,y_pos,z_pos)) #is -5
         # consider using tip size var to make it scale
@@ -246,7 +246,7 @@ def run(protocol: protocol_api.ProtocolContext, tiprack: str, removal: int, tip_
         hw_api.drop_tip(mount=Mount.LEFT, removal=removal)
         print("new one")
         if removal == 2:
-            hw_api.move_to(Mount.LEFT, Point(x_pos - knock_distance,y_pos,z_pos + adjustment), speed = 8)
+            hw_api.move_to(Mount.LEFT, Point(x_pos - knock_distance,y_pos,z_pos + adjustment), speed = 10)
         pleft.home()
     protocol.home()
     pleft.home()
@@ -286,4 +286,4 @@ if __name__ == "__main__":
     if args.tip_type == 1000:
         tiprack = "opentrons_flex_96_tiprack_1000ul"
 
-    asyncio.run(_main(args.simulate, tiprack, args.removal))
+    asyncio.run(_main(args.simulate, tiprack, args.removal, args.tip_location, args.tip_type))
