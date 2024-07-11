@@ -178,7 +178,7 @@ async def _main(simulate: bool, tiprack: str, removal: int):
             await asyncio.sleep(2)
     run(protocol, tiprack, removal)
 
-def run(protocol: protocol_api.ProtocolContext, tiprack: str, removal: int) -> None:
+def run(protocol: protocol_api.ProtocolContext, tiprack: str, removal: int, tip_location: int, tip_type: int) -> None:
 
     print("7")
 
@@ -213,25 +213,40 @@ def run(protocol: protocol_api.ProtocolContext, tiprack: str, removal: int) -> N
     hw_api = get_sync_hw_api(protocol)
     print("10")
     start = time.time()
+    #setup differences between waste chute and trash bin and tip types
+    if tip_type == 50 or tip_type == 200:
+        adjustment = 51
+    if tip_type == 1000:
+        adjustment = 90
+    x_pos = 400
+    y_pos = 395
+    z_pos = -5
+    knock_distance = 10
+    if removal == 2 and tip_location == 1:
+        x_pos = 330
+    elif removal == 2 and tip_location == 2:
+        knock_distance = 20
+        y_pos = 25
+        x_pos = 327
+        if tip_type == 50 or tip_type == 200:
+            z_pos = 128
+        if tip_type == 1000:
+            z_pos = 62
+
     #add pause to measure static charge
     for column in tiprack_columns:
         pleft.pick_up_tip(tiprack_1[column])
-        pleft.aspirate(50, reservoir[column])
-        print("aspirated")
-        pleft.dispense(50, pcr_plate[column])
-        print("dispensed")
-        x_pos = 400
-        if removal == 2:
-            x_pos = 330
-        hw_api.move_to(Mount.LEFT, Point(x_pos,395,200)) 
+        hw_api.move_rel(Mount.LEFT, Point(0,0,120)) #make it go up out of tiprack to avoid collision
+        
+        hw_api.move_to(Mount.LEFT, Point(x_pos,y_pos,220)) #200 is subject to change
         #405 for tape, 330 for bin
-        hw_api.move_to(Mount.LEFT, Point(x_pos,395,-5)) #is -5
+        hw_api.move_to(Mount.LEFT, Point(x_pos,y_pos,z_pos)) #is -5
         # consider using tip size var to make it scale
         print("104030")
         hw_api.drop_tip(mount=Mount.LEFT, removal=removal)
         print("new one")
         if removal == 2:
-            hw_api.move_to(Mount.LEFT, Point(x_pos - 10,395,46), speed = 8) #is 46
+            hw_api.move_to(Mount.LEFT, Point(x_pos - knock_distance,y_pos,z_pos + adjustment), speed = 8)
         pleft.home()
     protocol.home()
     pleft.home()
@@ -259,6 +274,8 @@ if __name__ == "__main__":
     parser.add_argument("--simulate", action="store_true")
     parser.add_argument("--tip_type", type=int)
     parser.add_argument("--removal", type=int)
+    #1 = trash bin, 2 = waste chute
+    parser.add_argument("--tip_location", type=int)
     args = parser.parse_args()
     if args.tip_type == 50:
         tiprack = "opentrons_flex_96_tiprack_50ul"

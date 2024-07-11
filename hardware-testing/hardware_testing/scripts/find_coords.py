@@ -97,11 +97,13 @@ def run(protocol: protocol_api.ProtocolContext, tiprack: str, removal: int) -> N
     hw_api = get_sync_hw_api(protocol)
     print("10")
     
-    for i in list(range(25)):
+    hw_api.move_to(Mount.LEFT, Point(327,25,220))
+
+    for i in list(range(100)):
         #Limits are 455,416,250
-        hw_api.move_to(Mount.LEFT, Point(400-(5*i),395,63))
+        hw_api.move_to(Mount.LEFT, Point(327,25,152))
         print(i)
-        time.sleep(4)
+        time.sleep(3)
     protocol.home()
     pleft.home()
 
