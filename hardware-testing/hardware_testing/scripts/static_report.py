@@ -59,6 +59,19 @@ async def _main(simulate: bool, tiprack: str, removal: int):
             "Firmware",
             "Pipette Serial",
             "Robot Serial",
+            "Voltages",
+            "1",
+            "1",
+            "3",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+            "9",
+            "10",
+            "11",
+            "12",
         ]
         # Upload to google has passed
         try:
@@ -205,24 +218,25 @@ def run(protocol: protocol_api.ProtocolContext, tiprack: str, removal: int) -> N
     pleft.home()
     hw_api = get_sync_hw_api(protocol)
     print("10")
+    #add pause to measure static charge
     for column in tiprack_columns:
         pleft.pick_up_tip(tiprack_1[column])
         pleft.aspirate(50, reservoir[column])
         print("aspirated")
         pleft.dispense(50, pcr_plate[column])
         print("dispensed")
-        x_pos = 405
+        x_pos = 400
         if removal == 2:
             x_pos = 330
         hw_api.move_to(Mount.LEFT, Point(x_pos,395,200)) 
         #405 for tape, 330 for bin
-        hw_api.move_to(Mount.LEFT, Point(x_pos,395,12))
+        hw_api.move_to(Mount.LEFT, Point(x_pos,395,-5)) #is -5
         # consider using tip size var to make it scale
         print("104030")
         hw_api.drop_tip(mount=Mount.LEFT, removal=removal)
         print("new one")
         if removal == 2:
-            hw_api.move_to(Mount.LEFT, Point(x_pos - 20,395,63), speed = 5) #was 380 for tape
+            hw_api.move_to(Mount.LEFT, Point(x_pos - 10,395,46), speed = 8) #is 46
         pleft.home()
     protocol.home()
     pleft.home()
