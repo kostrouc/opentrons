@@ -59,7 +59,6 @@ async def _main(simulate: bool, tiprack: str, removal: int):
             "Firmware",
             "Pipette Serial",
             "Robot Serial",
-            "Voltages",
             "1",
             "1",
             "3",
