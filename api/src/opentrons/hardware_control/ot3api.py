@@ -2645,9 +2645,11 @@ class OT3API(
             await self.move_to(checked_mount, safe_plunger_pos)
             if probe_settings.aspirate_while_sensing:
                 # TODO(cm, 7/8/24): remove p_prep_speed from the rate at some point
-                await self._move_to_plunger_bottom(checked_mount, rate=p_prep_speed)  # "speed" is not "rate"
+                await self._move_to_plunger_bottom(
+                    checked_mount, rate=instrument.blow_out_flow_rate
+                )
             else:
-                await self._move_to_plunger_top(checked_mount, rate=p_prep_speed)
+                await self._move_to_plunger_top(checked_mount, speed=p_prep_speed)
 
             try:
                 # move to where we want to start a pass and run a pass
@@ -2673,7 +2675,7 @@ class OT3API(
     async def _move_to_plunger_top(
         self,
         mount: OT3Mount,
-        rate: float,
+        speed: float,
         acquire_lock: bool = True,
     ) -> None:
         instrument = self._pipette_handler.get_pipette(mount)
@@ -2682,7 +2684,7 @@ class OT3API(
             instrument.plunger_positions.top,
             self._current_position,
         )
-        await self._move(target_pos, speed=rate, acquire_lock=acquire_lock)
+        await self._move(target_pos, speed=speed, acquire_lock=acquire_lock)
 
     async def capacitive_probe(
         self,
