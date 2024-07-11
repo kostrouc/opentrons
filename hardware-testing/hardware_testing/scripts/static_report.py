@@ -38,7 +38,6 @@ except ImportError:
 
 
 async def _main(simulate: bool, tiprack: str, removal: int):
-    start = time.time()
     print("3")
     if not simulate:
         print("4")
@@ -179,10 +178,6 @@ async def _main(simulate: bool, tiprack: str, removal: int):
             await asyncio.sleep(2)
     run(protocol, tiprack, removal)
 
-# from datetime we get our runtime
-    tot_run_time = int(time.time() - start)
-    print(tot_run_time)
-
 def run(protocol: protocol_api.ProtocolContext, tiprack: str, removal: int) -> None:
 
     print("7")
@@ -217,6 +212,7 @@ def run(protocol: protocol_api.ProtocolContext, tiprack: str, removal: int) -> N
     pleft.home()
     hw_api = get_sync_hw_api(protocol)
     print("10")
+    start = time.time()
     #add pause to measure static charge
     for column in tiprack_columns:
         pleft.pick_up_tip(tiprack_1[column])
@@ -240,6 +236,9 @@ def run(protocol: protocol_api.ProtocolContext, tiprack: str, removal: int) -> N
     protocol.home()
     pleft.home()
 
+    # from datetime we get our runtime
+    tot_run_time = int(time.time() - start)
+    print(tot_run_time)
 
 # TODO:
 # connect to google sheet
