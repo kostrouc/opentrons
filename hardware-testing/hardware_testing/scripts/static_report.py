@@ -215,9 +215,9 @@ def run(protocol: protocol_api.ProtocolContext, tiprack: str, removal: int, tip_
     start = time.time()
     #setup differences between waste chute and trash bin and tip types
     if tip_type == 50 or tip_type == 200:
-        adjustment = 51
+        adjustment = 49
     if tip_type == 1000:
-        adjustment = 93
+        adjustment = 88
     x_pos = 400
     y_pos = 395
     z_pos = -5
@@ -229,7 +229,7 @@ def run(protocol: protocol_api.ProtocolContext, tiprack: str, removal: int, tip_
         y_pos = 25
         x_pos = 327
         if tip_type == 50 or tip_type == 200:
-            z_pos = 128
+            z_pos = 81
         if tip_type == 1000:
             z_pos = 62
 
@@ -238,7 +238,7 @@ def run(protocol: protocol_api.ProtocolContext, tiprack: str, removal: int, tip_
         pleft.pick_up_tip(tiprack_1[column])
         hw_api.move_rel(Mount.LEFT, Point(0,0,120)) #make it go up out of tiprack to avoid collision
         
-        hw_api.move_to(Mount.LEFT, Point(x_pos,y_pos,140)) #200 is subject to change
+        hw_api.move_to(Mount.LEFT, Point(x_pos,y_pos,250-adjustment)) #200 is subject to change
         #405 for tape, 330 for bin
         hw_api.move_to(Mount.LEFT, Point(x_pos,y_pos,z_pos)) #is -5
         # consider using tip size var to make it scale

@@ -101,9 +101,9 @@ def run(protocol: protocol_api.ProtocolContext, tiprack: str, removal: int) -> N
 
     for i in list(range(100)):
         #Limits are 455,416,250
-        hw_api.move_to(Mount.LEFT, Point(327,25,152))
+        hw_api.move_to(Mount.LEFT, Point(327,25,150-i))
         print(i)
-        time.sleep(3)
+        time.sleep(2)
     protocol.home()
     pleft.home()
 
