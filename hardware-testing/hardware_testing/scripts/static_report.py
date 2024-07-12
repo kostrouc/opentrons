@@ -220,24 +220,29 @@ def run(protocol: protocol_api.ProtocolContext, tiprack: str, removal: int, tip_
     print("10")
     start = time.time()
     #setup differences between waste chute and trash bin and tip types
+    onek_adjust = 0
     if tip_type == 50 or tip_type == 200:
         adjustment = 49
     if tip_type == 1000:
-        adjustment = 88
+        adjustment = 87
     x_pos = 400
     y_pos = 395
     z_pos = -5
     knock_distance = 10
     if removal == 2 and tip_location == 1:
         x_pos = 330
+        if tip_type == 1000:
+            z_pos = -43
     elif removal == 2 and tip_location == 2:
-        knock_distance = 20
+        if tip_type == 1000:
+            onek_adjust = 25
+        knock_distance = 30
         y_pos = 25
         x_pos = 327
         if tip_type == 50 or tip_type == 200:
             z_pos = 81
         if tip_type == 1000:
-            z_pos = 62
+            z_pos = 60
 
     #add pause to measure static charge
     for column in tiprack_columns:
@@ -252,7 +257,7 @@ def run(protocol: protocol_api.ProtocolContext, tiprack: str, removal: int, tip_
         hw_api.drop_tip(mount=Mount.LEFT, removal=removal)
         print("new one")
         if removal == 2:
-            hw_api.move_to(Mount.LEFT, Point(x_pos - knock_distance,y_pos,z_pos + adjustment), speed = 10)
+            hw_api.move_to(Mount.LEFT, Point(x_pos - knock_distance,y_pos,(z_pos + adjustment - onek_adjust)))
         pleft.home()
     protocol.home()
     pleft.home()
