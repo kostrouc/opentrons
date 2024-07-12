@@ -48,6 +48,7 @@ async def _main(simulate: bool, tiprack: str, removal: int, tip_location: int, t
         print(sensor)
         header = [
             "Intention of Run",
+            "Removal Location",
             "Finish Time",
             "Tip Size",
             "Removed?",
@@ -59,7 +60,7 @@ async def _main(simulate: bool, tiprack: str, removal: int, tip_location: int, t
             "Pipette Serial",
             "Robot Serial",
             "1",
-            "1",
+            "2",
             "3",
             "4",
             "5",
@@ -102,6 +103,10 @@ async def _main(simulate: bool, tiprack: str, removal: int, tip_location: int, t
         if removal == 2:
             remove_type = "Removal Method 2"
         print("12")
+        if tip_location == 1:
+            location = "Trash Bin"
+        if tip_location == 2:
+            location = "Waste Chute"
         # adding data grabbed from the robot's HTTP page
         # From health: api ver, firm ver, rob serial
         response = requests.get(
@@ -125,6 +130,7 @@ async def _main(simulate: bool, tiprack: str, removal: int, tip_location: int, t
     #store most data in case of unsuccessful run
         row = [
             remove_type,
+            location,
             str(new_timestamp),
             args.tip_type,
             "",  # will only write if it is not removed, IE will be blank unless the run fails. LATER
