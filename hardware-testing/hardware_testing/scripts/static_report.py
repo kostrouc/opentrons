@@ -71,6 +71,7 @@ async def _main(simulate: bool, tiprack: str, removal: int, tip_location: int, t
             "10",
             "11",
             "12",
+            "Total",
         ]
         # Upload to google has passed
         try:
@@ -218,6 +219,13 @@ def run(protocol: protocol_api.ProtocolContext, tiprack: str, removal: int, tip_
     pleft.home()
     hw_api = get_sync_hw_api(protocol)
     print("10")
+    hw_api.move_to(Mount.LEFT, Point(125,25,250))
+    hw_api.drop_tip(mount=Mount.LEFT, removal=2)
+    input("Press Enter to continue...")    
+    #making my life 10x easier 
+    print("9 and 3/4")
+    protocol.home()
+    pleft.home()
     start = time.time()
     #setup differences between waste chute and trash bin and tip types
     onek_adjust = 0
