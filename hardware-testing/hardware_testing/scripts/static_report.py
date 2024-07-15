@@ -229,11 +229,11 @@ def run(protocol: protocol_api.ProtocolContext, tiprack: str, removal: int, tip_
     y_pos = 395
     z_pos = -5
     knock_distance = 10
-    if removal == 2 and tip_location == 1:
+    if (removal == 2 or removal == 0) and tip_location == 1:
         x_pos = 330
         if tip_type == 1000:
             z_pos = -43
-    elif removal == 2 and tip_location == 2:
+    elif (removal == 2 or removal == 0) and tip_location == 2:
         if tip_type == 1000:
             onek_adjust = 25
         knock_distance = 30
