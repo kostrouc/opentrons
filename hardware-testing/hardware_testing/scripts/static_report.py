@@ -242,15 +242,14 @@ def run(protocol: protocol_api.ProtocolContext, tiprack: str, removal: int, tip_
         if tip_type == 1000:
             z_pos = -43
     elif (removal == 2 or removal == 0) and tip_location == 2:
-        if tip_type == 1000:
-            onek_adjust = 25
         knock_distance = 30
         y_pos = 25
         x_pos = 327
         if tip_type == 50 or tip_type == 200:
             z_pos = 81
         if tip_type == 1000:
-            z_pos = 60
+            z_pos = 58
+            onek_adjust = 25
 
     #add pause to measure static charge
     for column in tiprack_columns:
