@@ -2125,7 +2125,7 @@ class InstrumentContext(publisher.CommandPublisher):
     def measure_liquid_height(self, well: labware.Well) -> float:
         """Check the height of the liquid within a well.
 
-        :returns: The height, in mm, of the liquid from the deck.
+        :returns: The height, in mm, of the liquid in the well.
 
         :meta private:
 
@@ -2133,4 +2133,4 @@ class InstrumentContext(publisher.CommandPublisher):
         """
         loc = well.top()
         height = self._core.liquid_probe_without_recovery(well._core, loc)
-        return height
+        return height - well.bottom().point.z
