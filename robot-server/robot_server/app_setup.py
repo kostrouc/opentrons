@@ -1,7 +1,6 @@
 """Main FastAPI application."""
-import asyncio
-import logging
-from typing import Optional
+import contextlib
+from typing import AsyncGenerator, Optional
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -40,7 +39,54 @@ from .service.notifications import (
     clean_up_notification_client,
 )
 
-log = logging.getLogger(__name__)
+
+@contextlib.asynccontextmanager
+async def _lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    async with contextlib.AsyncExitStack() as exit_stack:
+        settings = get_settings()
+
+        if settings.persistence_directory == "automatically_make_temporary":
+            persistence_directory: Optional[Path] = None
+        else:
+            persistence_directory = settings.persistence_directory
+
+        initialize_logging()
+
+        initialize_task_runner(app_state=app.state)
+        exit_stack.push_async_callback(clean_up_task_runner, app.state)
+
+        fbl_init(app_state=app.state)
+        exit_stack.push_async_callback(fbl_clean_up, app.state)
+
+        start_initializing_hardware(
+            app_state=app.state,
+            callbacks=[
+                # Flex light control:
+                (start_light_control_task, True),
+                (mark_light_control_startup_finished, False),
+                # OT-2 light control:
+                (fbl_start_blinking, True),
+                (fbl_mark_hardware_init_complete, False),
+            ],
+        )
+        exit_stack.push_async_callback(clean_up_hardware, app.state)
+
+        start_initializing_persistence(
+            app_state=app.state,
+            persistence_directory_root=persistence_directory,
+            done_callbacks=[
+                # For OT-2 light control only. The Flex status bar isn't handled here
+                # because it's currently tied to hardware and run status, not to
+                # initialization of the persistence layer.
+                fbl_mark_persistence_init_complete
+            ],
+        )
+        exit_stack.push_async_callback(clean_up_persistence, app.state)
+
+        await initialize_notifications(app.state)
+        exit_stack.push_async_callback(clean_up_notification_client, app.state)
+
+        yield
 
 
 app = FastAPI(
@@ -57,6 +103,7 @@ app = FastAPI(
     # Disable documentation hosting via Swagger UI, normally at /docs.
     # We instead focus on the docs hosted by ReDoc, at /redoc.
     docs_url=None,
+    lifespan=_lifespan,
 )
 
 # cors
@@ -70,64 +117,3 @@ app.add_middleware(
 
 # main router
 app.include_router(router=router)
-
-
-@app.on_event("startup")
-async def on_startup() -> None:
-    """Handle app startup."""
-    settings = get_settings()
-
-    if settings.persistence_directory == "automatically_make_temporary":
-        persistence_directory: Optional[Path] = None
-    else:
-        persistence_directory = settings.persistence_directory
-
-    initialize_logging()
-    initialize_task_runner(app_state=app.state)
-    fbl_init(app_state=app.state)
-    start_initializing_hardware(
-        app_state=app.state,
-        callbacks=[
-            # Flex light control:
-            (start_light_control_task, True),
-            (mark_light_control_startup_finished, False),
-            # OT-2 light control:
-            (fbl_start_blinking, True),
-            (fbl_mark_hardware_init_complete, False),
-        ],
-    )
-    start_initializing_persistence(
-        app_state=app.state,
-        persistence_directory_root=persistence_directory,
-        done_callbacks=[
-            # For OT-2 light control only. The Flex status bar isn't handled here
-            # because it's currently tied to hardware and run status, not to
-            # initialization of the persistence layer.
-            fbl_mark_persistence_init_complete
-        ],
-    )
-    await initialize_notifications(
-        app_state=app.state,
-    )
-
-
-@app.on_event("shutdown")
-async def on_shutdown() -> None:
-    """Handle app shutdown."""
-    # FIXME(mm, 2024-01-31): Cleaning up everything concurrently like this is prone to
-    # race conditions, e.g if we clean up hardware before we clean up the background
-    # task that's blinking the front button light (which uses the hardware).
-    # Startup and shutdown should be in FILO order.
-    shutdown_results = await asyncio.gather(
-        fbl_clean_up(app.state),
-        clean_up_hardware(app.state),
-        clean_up_persistence(app.state),
-        clean_up_task_runner(app.state),
-        clean_up_notification_client(app.state),
-        return_exceptions=True,
-    )
-
-    shutdown_errors = [r for r in shutdown_results if isinstance(r, BaseException)]
-
-    for e in shutdown_errors:
-        log.warning("Error during shutdown", exc_info=e)
