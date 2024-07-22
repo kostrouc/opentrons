@@ -42,6 +42,13 @@ from .service.notifications import (
 
 @contextlib.asynccontextmanager
 async def _lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    """The server's startup and shutdown logic.
+
+    Entering this context manager sets up our custom global objects
+    so they'll be ready when we process requests.
+
+    Exiting this context manager cleans everything up.
+    """
     async with contextlib.AsyncExitStack() as exit_stack:
         settings = get_settings()
 
