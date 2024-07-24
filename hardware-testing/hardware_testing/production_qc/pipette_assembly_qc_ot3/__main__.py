@@ -824,7 +824,6 @@ async def _read_pipette_sensor_repeatedly_and_average(
             else:
                 raise ValueError(f"unexpected sensor type: {sensor_type}")
             
-            sequential_failures = 0
             #print(f"{sensor_type} {sensor_id} sensor response {r}")
             LOG_GING.info(f"{sensor_type} {sensor_id} sensor response {r}")
         except helpers_ot3.SensorResponseBad:
