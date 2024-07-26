@@ -164,7 +164,7 @@ async def _main(simulate: bool, tiprack: str, removal: int, tip_location: int, t
     protocol = helpers.get_api_context(
         "2.18",  # type: ignore[attr-defined]
         is_simulating=simulate,
-        pipette_left="p1000_multi_flex",
+        pipette_left="p50_multi_flex",
     )
     for offset in LABWARE_OFFSETS:
         engine = protocol._core._engine_client._transport._engine  # type: ignore[attr-defined]
@@ -173,7 +173,7 @@ async def _main(simulate: bool, tiprack: str, removal: int, tip_location: int, t
     hw_api = get_sync_hw_api(protocol)
     helpers_ot3.restart_server_ot3()
     for i in range(25):
-        hw_api.cache_instruments(require={Mount.LEFT: "p1000_multi_flex"})
+        hw_api.cache_instruments(require={Mount.LEFT: "p50_multi_flex"})
         attached = hw_api.attached_pipettes
         try:
             print(attached[Mount.LEFT])
@@ -190,7 +190,7 @@ def run(protocol: protocol_api.ProtocolContext, tiprack: str, removal: int, tip_
     print("7")
 
     # Instrument setup
-    pleft = protocol.load_instrument("flex_8channel_1000", "left")
+    pleft = protocol.load_instrument("flex_8channel_50", "left")
     print("8")
     # DECK SETUP AND LABWARE
     tiprack_1 = protocol.load_labware(tiprack, location="D1")
