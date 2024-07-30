@@ -1872,18 +1872,16 @@ async def _main(test_config: TestConfig) -> None:  # noqa: C901
                 pipette_right="p1000_multi_v3.4",
             )
         except Exception as errv:
-            print(errv)
+            print("07-04识别不到移液器:无法识别该移液器类型.",errv)
         
         
 
         global pipptype
         pipptype = api.get_all_attached_instr()
-        print(pipptype)
-        input()
         try:
             print(f"pipette type: {pipptype[OT3Mount.LEFT]['name']}")
         except Exception as errr:
-            print("07-04移液器无条码:移液器没烧录条码")
+            print("07-05移液器无条码:移液器没烧录条码")
 
 
         # home and move to attach position
