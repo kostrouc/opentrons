@@ -125,7 +125,7 @@ async def _main(simulate: bool, tiprack: str, removal: int, tip_location: int, t
             f"http://{ip}:31950/pipettes", headers={"opentrons-version": "3"}
         )
         pipette_data = response.json()
-        pipette_serial = pipette_data["left"].get("id", "")
+        pipette_serial = pipette_data['right'].get("id", "")
         print("15")
 
     #store most data in case of unsuccessful run
@@ -159,38 +159,42 @@ async def _main(simulate: bool, tiprack: str, removal: int, tip_location: int, t
 
 
 
-        LABWARE_OFFSETS.extend(workarounds.http_get_all_labware_offsets())
-    print(f"simulate {simulate}")
-    protocol = helpers.get_api_context(
-        "2.18",  # type: ignore[attr-defined]
-        is_simulating=simulate,
-        pipette_left="p50_multi_flex",
-    )
-    for offset in LABWARE_OFFSETS:
-        engine = protocol._core._engine_client._transport._engine  # type: ignore[attr-defined]
-        engine.state_view._labware_store._add_labware_offset(offset)
+    #     LABWARE_OFFSETS.extend(workarounds.http_get_all_labware_offsets())
+    # print(f"simulate {simulate}")
+    # protocol = helpers.get_api_context(
+    #     "2.18",  # type: ignore[attr-defined]
+    #     is_simulating=simulate,
+    #     pipette_right="p1000_multi_flex",
+    # )
+   
+    # # for offset in LABWARE_OFFSETS:
+    # #     engine = protocol._core._engine_client._transport._engine  # type: ignore[attr-defined]
+    # #     if offset.id not in engine.state_view._labware_store._state.labware_offsets_by_id:
+    # #         engine.state_view._labware_store._add_labware_offset(offset)
+    # #     else:
+    # #         print(f"Labware offset ID {offset.id} already exists.")
 
-    hw_api = get_sync_hw_api(protocol)
-    helpers_ot3.restart_server_ot3()
-    for i in range(25):
-        hw_api.cache_instruments(require={Mount.LEFT: "p50_multi_flex"})
-        attached = hw_api.attached_pipettes
-        try:
-            print(attached[Mount.LEFT])
-            print(attached[Mount.LEFT]['name'])
+    # # hw_api = get_sync_hw_api(protocol)
+    # # helpers_ot3.restart_server_ot3()
+    # # for i in range(25):
+    # #     hw_api.cache_instruments(require={Mount.RIGHT: "p1000_multi_flex"})
+    # #     attached = hw_api.attached_pipettes
+    # #     try:
+    # #         print(attached[Mount.RIGHT])
+    # #         print(attached[Mount.RIGHT]['name'])
 
-            break
-        except:
-            print("failed to find")
-            await asyncio.sleep(2)
-    run(protocol, tiprack, removal, tip_location, tip_type)
+    # #         break
+    # #     except:
+    # #         print("failed to find")
+    # #         await asyncio.sleep(2)
+    # # #run(protocol, tiprack, removal, tip_location, tip_type)
 
 def run(protocol: protocol_api.ProtocolContext, tiprack: str, removal: int, tip_location: int, tip_type: int) -> None:
 
     print("7")
 
     # Instrument setup
-    pleft = protocol.load_instrument("flex_8channel_50", "left")
+    pr = protocol.load_instrument("flex_8channel_50", 'right')
     print("8")
     # DECK SETUP AND LABWARE
     tiprack_1 = protocol.load_labware(tiprack, location="D1")
@@ -216,16 +220,16 @@ def run(protocol: protocol_api.ProtocolContext, tiprack: str, removal: int, tip_
     ]
     print("9")
     protocol.home()
-    pleft.home()
+    pr.home()
     hw_api = get_sync_hw_api(protocol)
     print("10")
-    hw_api.move_to(Mount.LEFT, Point(125,25,250))
-    hw_api.drop_tip(mount=Mount.LEFT, removal=2)
+    hw_api.move_to(Mount.RIGHT, Point(125,25,250))
+    hw_api.drop_tip(mount=Mount.RIGHT, removal=2)
     input("Press Enter to continue...")    
     #making my life 10x easier 
     print("9 and 3/4")
     protocol.home()
-    pleft.home()
+    pr.home()
     start = time.time()
     #setup differences between waste chute and trash bin and tip types
     onek_adjust = 0
@@ -253,21 +257,21 @@ def run(protocol: protocol_api.ProtocolContext, tiprack: str, removal: int, tip_
 
     #add pause to measure static charge
     for column in tiprack_columns:
-        pleft.pick_up_tip(tiprack_1[column])
-        hw_api.move_rel(Mount.LEFT, Point(0,0,120)) #make it go up out of tiprack to avoid collision
+        pr.pick_up_tip(tiprack_1[column])
+        hw_api.move_rel(Mount.RIGHT, Point(0,0,120)) #make it go up out of tiprack to avoid collision
         
-        hw_api.move_to(Mount.LEFT, Point(x_pos,y_pos,250-adjustment)) #200 is subject to change
+        hw_api.move_to(Mount.RIGHT, Point(x_pos,y_pos,250-adjustment)) #200 is subject to change
         #405 for tape, 330 for bin
-        hw_api.move_to(Mount.LEFT, Point(x_pos,y_pos,z_pos)) #is -5
+        hw_api.move_to(Mount.RIGHT, Point(x_pos,y_pos,z_pos)) #is -5
         # consider using tip size var to make it scale
         print("104030")
-        hw_api.drop_tip(mount=Mount.LEFT, removal=removal)
+        hw_api.drop_tip(mount=Mount.RIGHT, removal=removal)
         print("new one")
         if removal == 2:
-            hw_api.move_to(Mount.LEFT, Point(x_pos - knock_distance,y_pos,(z_pos + adjustment - onek_adjust)))
-        pleft.home()
+            hw_api.move_to(Mount.RIGHT, Point(x_pos - knock_distance,y_pos,(z_pos + adjustment - onek_adjust)))
+        pr.home()
     protocol.home()
-    pleft.home()
+    pr.home()
 
     # from datetime we get our runtime
     tot_run_time = int(time.time() - start)
