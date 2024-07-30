@@ -143,7 +143,7 @@ async def _main(simulate: bool, tiprack: str, removal: int, tip_location: int, t
             pipette_serial,
             rob_serial,
         ]
-        print("help?")
+        print("do my changes matter")
         # write to google sheet
         try:
             if google_sheet.credentials.access_token_expired:
@@ -155,39 +155,39 @@ async def _main(simulate: bool, tiprack: str, removal: int, tip_location: int, t
         except RuntimeError:
             print("Did not write row.")
         # hopefully this writes to the google sheet
-        print("help")
+        print("hope so")
 
 
 
-    #     LABWARE_OFFSETS.extend(workarounds.http_get_all_labware_offsets())
-    # print(f"simulate {simulate}")
-    # protocol = helpers.get_api_context(
-    #     "2.18",  # type: ignore[attr-defined]
-    #     is_simulating=simulate,
-    #     pipette_right="p1000_multi_flex",
-    # )
+        LABWARE_OFFSETS.extend(workarounds.http_get_all_labware_offsets())
+    print(f"simulate {simulate}")
+    protocol = helpers.get_api_context(
+        "2.18",  # type: ignore[attr-defined]
+        is_simulating=simulate,
+        pipette_right="p1000_multi_flex",
+    )
    
-    # # for offset in LABWARE_OFFSETS:
-    # #     engine = protocol._core._engine_client._transport._engine  # type: ignore[attr-defined]
-    # #     if offset.id not in engine.state_view._labware_store._state.labware_offsets_by_id:
-    # #         engine.state_view._labware_store._add_labware_offset(offset)
-    # #     else:
-    # #         print(f"Labware offset ID {offset.id} already exists.")
+    for offset in LABWARE_OFFSETS:
+        engine = protocol._core._engine_client._transport._engine  # type: ignore[attr-defined]
+        if offset.id not in engine.state_view._labware_store._state.labware_offsets_by_id:
+            engine.state_view._labware_store._add_labware_offset(offset)
+        else:
+            print(f"Labware offset ID {offset.id} already exists.")
 
-    # # hw_api = get_sync_hw_api(protocol)
-    # # helpers_ot3.restart_server_ot3()
-    # # for i in range(25):
-    # #     hw_api.cache_instruments(require={Mount.RIGHT: "p1000_multi_flex"})
-    # #     attached = hw_api.attached_pipettes
-    # #     try:
-    # #         print(attached[Mount.RIGHT])
-    # #         print(attached[Mount.RIGHT]['name'])
+    hw_api = get_sync_hw_api(protocol)
+    helpers_ot3.restart_server_ot3()
+    for i in range(25):
+        hw_api.cache_instruments(require={Mount.RIGHT: "p1000_multi_flex"})
+        attached = hw_api.attached_pipettes
+        try:
+            print(attached[Mount.RIGHT])
+            print(attached[Mount.RIGHT]['name'])
 
-    # #         break
-    # #     except:
-    # #         print("failed to find")
-    # #         await asyncio.sleep(2)
-    # # #run(protocol, tiprack, removal, tip_location, tip_type)
+            break
+        except:
+            print("failed to find")
+            await asyncio.sleep(2)
+    run(protocol, tiprack, removal, tip_location, tip_type)
 
 def run(protocol: protocol_api.ProtocolContext, tiprack: str, removal: int, tip_location: int, tip_type: int) -> None:
 
