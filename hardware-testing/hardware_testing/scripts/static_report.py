@@ -37,7 +37,7 @@ except ImportError:
     pass
 
 
-async def _main(simulate: bool, tiprack: str, removal: int, tip_location: int, tip_type: int):
+async def _main(simulate: bool, tiprack: str, removal: int, tip_location: int, tip_type: int, pipette_size: int):
     print("3")
     """
     if not simulate:
@@ -188,9 +188,9 @@ async def _main(simulate: bool, tiprack: str, removal: int, tip_location: int, t
         except:
             print("failed to find")
             await asyncio.sleep(2)
-    run(protocol, tiprack, removal, tip_location, tip_type)
+    run(protocol, tiprack, removal, tip_location, tip_type, pipette_size)
 
-def run(protocol: protocol_api.ProtocolContext, tiprack: str, removal: int, tip_location: int, tip_type: int) -> None:
+def run(protocol: protocol_api.ProtocolContext, tiprack: str, removal: int, tip_location: int, tip_type: int, pipette_size: int) -> None:
 
     print("7")
 
@@ -233,28 +233,29 @@ def run(protocol: protocol_api.ProtocolContext, tiprack: str, removal: int, tip_
     pleft.home()
     start = time.time()
     #setup differences between waste chute and trash bin and tip types
-    onek_adjust = 0
-    if tip_type == 50 or tip_type == 200:
-        adjustment = 49
-    if tip_type == 1000:
-        adjustment = 87
-    x_pos = 400
-    y_pos = 395
-    z_pos = -5
-    knock_distance = 10
-    if (removal == 2 or removal == 0) and tip_location == 1:
-        x_pos = 330
-        if tip_type == 1000:
-            z_pos = -43
-    elif (removal == 2 or removal == 0) and tip_location == 2:
-        knock_distance = 30
-        y_pos = 25
-        x_pos = 327
+    if pipette_size == 8:
+        onek_adjust = 0
         if tip_type == 50 or tip_type == 200:
-            z_pos = 81
+            adjustment = 49
         if tip_type == 1000:
-            z_pos = 58
-            onek_adjust = 25
+            adjustment = 87
+        x_pos = 400
+        y_pos = 395
+        z_pos = -5
+        knock_distance = 10
+        if (removal == 2 or removal == 0) and tip_location == 1:
+            x_pos = 330
+            if tip_type == 1000:
+                z_pos = -43
+        elif (removal == 2 or removal == 0) and tip_location == 2:
+            knock_distance = 30
+            y_pos = 25
+            x_pos = 327
+            if tip_type == 50 or tip_type == 200:
+                z_pos = 81
+            if tip_type == 1000:
+                z_pos = 58
+                onek_adjust = 25
 
     #add pause to measure static charge
     for column in tiprack_columns:
@@ -284,6 +285,7 @@ if __name__ == "__main__":
     parser.add_argument("--simulate", action="store_true")
     parser.add_argument("--tip_type", type=int)
     parser.add_argument("--removal", type=int)
+    parser.add_argument("--pipette_size", type=int)
     #1 = trash bin, 2 = waste chute
     parser.add_argument("--tip_location", type=int)
     args = parser.parse_args()
@@ -296,4 +298,4 @@ if __name__ == "__main__":
     if args.tip_type == 1000:
         tiprack = "opentrons_flex_96_tiprack_1000ul"
 
-    asyncio.run(_main(args.simulate, tiprack, args.removal, args.tip_location, args.tip_type))
+    asyncio.run(_main(args.simulate, tiprack, args.removal, args.tip_location, args.tip_type, args.pipette_size))
