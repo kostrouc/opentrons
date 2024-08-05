@@ -40,15 +40,18 @@ async def _main(simulate: bool, tiprack: str, removal: int):
     protocol = helpers.get_api_context(
         "2.18",  # type: ignore[attr-defined]
         is_simulating=simulate,
-        pipette_left="p1000_multi_flex",
+        pipette_left="p1000_96",
     )
     for offset in LABWARE_OFFSETS:
         engine = protocol._core._engine_client._transport._engine  # type: ignore[attr-defined]
-        engine.state_view._labware_store._add_labware_offset(offset)
+        if offset.id not in engine.state_view._labware_store._state.labware_offsets_by_id:
+            engine.state_view._labware_store._add_labware_offset(offset)
+        else:
+            print(f"Labware offset ID {offset.id} already exists.")
 
     hw_api = get_sync_hw_api(protocol)
     for i in range(25):
-        hw_api.cache_instruments(require={Mount.LEFT: "p1000_multi_flex"})
+        hw_api.cache_instruments(require={Mount.LEFT: "p1000_96"})
         attached = hw_api.attached_pipettes
         try:
             print(attached[Mount.LEFT])
@@ -67,7 +70,7 @@ def run(protocol: protocol_api.ProtocolContext, tiprack: str, removal: int) -> N
     print("7")
 
     # Instrument setup
-    pleft = protocol.load_instrument("flex_8channel_1000", "left")
+    pleft = protocol.load_instrument("flex_96channel_1000", "left")
     print("8")
     # DECK SETUP AND LABWARE
     tiprack_1 = protocol.load_labware(tiprack, location="D1")
@@ -97,11 +100,12 @@ def run(protocol: protocol_api.ProtocolContext, tiprack: str, removal: int) -> N
     hw_api = get_sync_hw_api(protocol)
     print("10")
     
-    hw_api.move_to(Mount.LEFT, Point(327,25,200))
+    hw_api.move_to(Mount.LEFT, Point(334,26,250))
+    input("Press Enter to continue...")    
 
     for i in list(range(100)):
-        #Limits are 455,416,250
-        hw_api.move_to(Mount.LEFT, Point(327,25,150-i))
+        #Center chute for 96ch 50 and 200: 334,26,128, 150 for 1000uL
+        hw_api.move_to(Mount.LEFT, Point(334,26,150))
         print(i)
         time.sleep(2)
     protocol.home()

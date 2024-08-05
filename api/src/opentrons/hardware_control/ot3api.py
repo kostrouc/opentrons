@@ -2189,7 +2189,7 @@ class OT3API(
             await self._backend.tip_action(
                 origin={Axis.Q: gear_origin_float}, targets=move_targets
             )
-            await self.home_gear_motors()
+            #await self.home_gear_motors()
 
     def cache_tip(
         self, mount: Union[top_types.Mount, OT3Mount], tip_length: float
@@ -2260,7 +2260,7 @@ class OT3API(
         await self._move_to_plunger_bottom(realmount, rate=1.0, check_current_vol=False)
 
         if self.gantry_load == GantryLoad.HIGH_THROUGHPUT:
-            spec = self._pipette_handler.plan_ht_drop_tip()
+            spec = self._pipette_handler.plan_ht_drop_tip(removal)
             await self._tip_motor_action(realmount, spec.tip_action_moves)
         else:
             spec = self._pipette_handler.plan_lt_drop_tip(realmount, removal)

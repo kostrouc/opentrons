@@ -714,14 +714,14 @@ class OT3PipetteHandler:
                     Axis.Q: tip_motor_current,
                 },
             ),
-            TipActionMoveSpec(
-                distance=prep_move_dist + clamp_move_dist,
-                speed=clamp_move_speed,
-                currents={
-                    Axis.P_L: plunger_current,
-                    Axis.Q: tip_motor_current,
-                },
-            ),
+            # TipActionMoveSpec(
+            #     distance=prep_move_dist + clamp_move_dist,
+            #     speed=clamp_move_speed,
+            #     currents={
+            #         Axis.P_L: plunger_current,
+            #         Axis.Q: tip_motor_current,
+            #     },
+            # ),
         ]
 
     @staticmethod
@@ -944,7 +944,7 @@ class OT3PipetteHandler:
             shake_off_moves=shakes,
         )
 
-    def plan_ht_drop_tip(self) -> TipActionSpec:
+    def plan_ht_drop_tip(self, removal: int = 0) -> TipActionSpec:
         mount = OT3Mount.LEFT
         instrument = self.get_pipette(mount)
         config = instrument.drop_configurations.cam_action

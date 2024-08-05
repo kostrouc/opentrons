@@ -37,7 +37,7 @@ except ImportError:
     pass
 
 
-async def _main(simulate: bool, tiprack: str, removal: int, tip_location: int, tip_type: int, pipette_size: int):
+async def _main(simulate: bool, tiprack: str, removal: int, tip_location: int, tip_type: int, pipette_size: int, nozzles, nozzle2):
     print("3")
     """
     if not simulate:
@@ -165,7 +165,7 @@ async def _main(simulate: bool, tiprack: str, removal: int, tip_location: int, t
     protocol = helpers.get_api_context(
         "2.18",  # type: ignore[attr-defined]
         is_simulating=simulate,
-        pipette_left="p1000_single_flex",
+        pipette_left= nozzle2,
     )
    
     for offset in LABWARE_OFFSETS:
@@ -178,7 +178,7 @@ async def _main(simulate: bool, tiprack: str, removal: int, tip_location: int, t
     hw_api = get_sync_hw_api(protocol)
     helpers_ot3.restart_server_ot3()
     for i in range(25):
-        hw_api.cache_instruments(require={Mount.LEFT: "p1000_single_flex"})
+        hw_api.cache_instruments(require={Mount.LEFT: nozzle2})
         attached = hw_api.attached_pipettes
         try:
             print(attached[Mount.LEFT])
@@ -188,14 +188,14 @@ async def _main(simulate: bool, tiprack: str, removal: int, tip_location: int, t
         except:
             print("failed to find")
             await asyncio.sleep(2)
-    run(protocol, tiprack, removal, tip_location, tip_type, pipette_size)
+    run(protocol, tiprack, removal, tip_location, tip_type, pipette_size, nozzles, nozzle2)
 
-def run(protocol: protocol_api.ProtocolContext, tiprack: str, removal: int, tip_location: int, tip_type: int, pipette_size: int) -> None:
+def run(protocol: protocol_api.ProtocolContext, tiprack: str, removal: int, tip_location: int, tip_type: int, pipette_size: int, nozzles, nozzle2) -> None:
 
     print("7")
 
     # Instrument setup
-    pleft = protocol.load_instrument("flex_1channel_1000", 'left')
+    pleft = protocol.load_instrument(nozzles, "left")
     print("8")
     # DECK SETUP AND LABWARE
     tiprack_1 = protocol.load_labware(tiprack, location="D1")
@@ -220,17 +220,21 @@ def run(protocol: protocol_api.ProtocolContext, tiprack: str, removal: int, tip_
         "A12",
     ]
     print("9")
-    protocol.home()
-    pleft.home()
+    #protocol.home()
+    print("9.5")
+    #pleft.home()
+    print("9.75")
     hw_api = get_sync_hw_api(protocol)
     print("10")
     hw_api.move_to(Mount.LEFT, Point(125,25,250))
     hw_api.drop_tip(mount=Mount.LEFT, removal=2)
+    print("hello? anyone home?")
     input("Press Enter to continue...")    
     #making my life 10x easier 
     print("9 and 3/4")
-    protocol.home()
-    pleft.home()
+    #if pipette_size != 96:    
+        #protocol.home()   
+        #pleft.home()
     start = time.time()
     #setup differences between waste chute and trash bin and tip types
     if pipette_size == 8:
@@ -257,23 +261,44 @@ def run(protocol: protocol_api.ProtocolContext, tiprack: str, removal: int, tip_
                 z_pos = 58
                 onek_adjust = 25
 
+    if pipette_size == 96:
+        onek_adjust = 0
+        adjustment = 0
+        # if tip_type == 50 or tip_type == 200:
+        #     adjustment = 49
+        # if tip_type == 1000:
+        #     adjustment = 87
+        y_pos = 26
+        x_pos = 334
+        knock_distance = 250
+        if tip_location == 1:
+            sys.exit("Cannot use 96ch and trash bin.")
+        elif (removal == 2 or removal == 0) and tip_location == 2:
+            if tip_type == 50 or tip_type == 200:
+                z_pos = 135
+            if tip_type == 1000:
+                z_pos = 150
+
+
     #add pause to measure static charge
     for column in tiprack_columns:
-        pleft.pick_up_tip(tiprack_1[column])
-        hw_api.move_rel(Mount.LEFT, Point(0,0,120)) #make it go up out of tiprack to avoid collision
+        if pipette_size != 96:    
+            pleft.pick_up_tip(tiprack_1[column])
+            hw_api.move_rel(Mount.LEFT, Point(0,0,120)) #make it go up out of tiprack to avoid collision
         
         hw_api.move_to(Mount.LEFT, Point(x_pos,y_pos,250-adjustment)) #200 is subject to change
         #405 for tape, 330 for bin
         hw_api.move_to(Mount.LEFT, Point(x_pos,y_pos,z_pos)) #is -5
         # consider using tip size var to make it scale
         print("104030")
-        hw_api.drop_tip(mount=Mount.LEFT, removal=removal)
+        if pipette_size != 96:    
+            hw_api.drop_tip(mount=Mount.LEFT, removal=removal)
         print("new one")
         if removal == 2:
             hw_api.move_to(Mount.LEFT, Point(x_pos - knock_distance,y_pos,(z_pos + adjustment - onek_adjust)))
-        pleft.home()
-    protocol.home()
-    pleft.home()
+        #pleft.home()
+    #protocol.home()
+    #pleft.home()
 
     # from datetime we get our runtime
     tot_run_time = int(time.time() - start)
@@ -297,5 +322,17 @@ if __name__ == "__main__":
 
     if args.tip_type == 1000:
         tiprack = "opentrons_flex_96_tiprack_1000ul"
+    
+    if args.pipette_size == 1:
+        nozzles = "flex_1channel_1000"
+        nozzle2 = "p1000_single_flex"
 
-    asyncio.run(_main(args.simulate, tiprack, args.removal, args.tip_location, args.tip_type, args.pipette_size))
+    if args.pipette_size == 8:
+        nozzles = "flex_8channel_1000"
+        nozzle2 = "p1000_multi_flex"
+
+    if args.pipette_size == 96:
+        nozzles = "flex_96channel_1000"
+        nozzle2 = "p1000_96"
+
+    asyncio.run(_main(args.simulate, tiprack, args.removal, args.tip_location, args.tip_type, args.pipette_size, nozzles, nozzle2))
