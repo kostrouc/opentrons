@@ -3,8 +3,10 @@
 import argparse
 import asyncio
 import datetime
+import time
 import csv
 from opentrons_shared_data import errors
+import requests
 
 from hardware_testing.opentrons_api.types import (
     OT3Mount,
@@ -28,30 +30,12 @@ async def _main(
     timeout_start = time.time()
     timeout = time_min * 60
     count = 0
-    x_offset = 80
-    y_offset = 44
     
     #grab robot info and pipette info
-    
+    #ip = input("Robot IP: ")
 
 
     # Create csv file and add initial line
-    current_datetime = datetime.datetime.now()
-    time = current_datetime.strftime("%m-%d, at %H-%M-%S")
-
-    init_data = [
-        [f"Robot: {robot}", f" Mount: {mount_name}", f" distance: dist", f" Pipette Serial: SERIAL NUMBER"],
-    ]
-
-    file_path = f"C:/Users/NicholasShiland/Desktop/{robot} test on {time}"
-
-    with open(file_path, mode="w", newline="") as creating_new_csv_file:
-        writer = csv.writer(creating_new_csv_file)
-        writer.writerows(init_data)
-    
-
-
-
 
 
     #finding home and starting to move
@@ -59,20 +43,15 @@ async def _main(
         await hw_api.home()
         await asyncio.sleep(1)
         await hw_api.set_lights(rails=True)
-        home_position = await hw_api.current_position_ot3(mount)
         try:
             await hw_api.grip(force_newtons=None, stay_engaged=True)
         except errors.exceptions.GripperNotPresentError:
             print("Gripper not attached.")
-        print(f"home: {home_position}")
-        x_home = home_position[Axis.X] - x_offset
-        y_home = home_position[Axis.Y] - y_offset
-        z_home = home_position[z_axis]
         while time.time() < timeout_start + timeout:
             # while True:
             print(f"time: {time.time()-timeout_start}")
-            await hw_api.move_to(mount, Point(x_home, y_home, z_home))
-            await hw_api.move_to(mount, Point(x_home, y_home, z_home - int(distance)))
+            await hw_api.move_rel(mount, Point(0, 0, -int(distance)))
+            await hw_api.move_to(mount, Point(0, 0, int(distance)))
             count += 1
             print(f"cycle: {count}")
         await hw_api.home()
