@@ -152,6 +152,7 @@ export function ProtocolRunHeader({
     displayName,
     protocolKey,
     isProtocolAnalyzing,
+    isQuickTransfer,
   } = useProtocolDetailsForRun(runId)
   const { reportRecoveredRunResult } = useRecoveryAnalytics()
 
@@ -266,7 +267,13 @@ export function ProtocolRunHeader({
           ...robotAnalyticsData,
         },
       })
-      closeCurrentRun()
+      closeCurrentRun({
+        onSuccess: () => {
+          if (isQuickTransfer) {
+            navigate(`/devices/${robotName}`)
+          }
+        },
+      })
     }
   }, [runStatus, isRunCurrent, runId, closeCurrentRun])
 
@@ -314,7 +321,13 @@ export function ProtocolRunHeader({
       name: ANALYTICS_PROTOCOL_RUN_ACTION.FINISH,
       properties: robotAnalyticsData ?? undefined,
     })
-    closeCurrentRun()
+    closeCurrentRun({
+      onSuccess: () => {
+        if (isQuickTransfer) {
+          navigate(`/devices/${robotName}`)
+        }
+      },
+    })
   }
 
   return (
@@ -416,7 +429,13 @@ export function ProtocolRunHeader({
             onCloseClick={() => {
               resetTipStatus()
               setShowDropTipBanner(false)
-              closeCurrentRun()
+              closeCurrentRun({
+                onSuccess: () => {
+                  if (isQuickTransfer) {
+                    navigate(`/devices/${robotName}`)
+                  }
+                },
+              })
             }}
           />
         ) : null}
