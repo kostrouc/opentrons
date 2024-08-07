@@ -23,8 +23,7 @@ async def _main(
     mount: OT3Mount, mount_name: str, simulate: bool, time_min: int, z_axis: Axis, distance: int
 ) -> None:
     
-    #make folder for tests
-    # check if directory exists, make if doesn't
+    # check if folder exists, make folder if it doesn't
     #BASE_DIRECTORY = "/users/NicholasShiland/Desktop/gripper_and_z_test/"
     BASE_DIRECTORY = "/userfs/data/testing_data/gripper_and_z_test/"
     if not os.path.exists(BASE_DIRECTORY):
@@ -86,8 +85,33 @@ async def _main(
     timeout_start = time.time()
     timeout = time_min * 60
     count = 0
-
+    errored = 0
     #finding home and starting to move
+    await hw_api.home()
+    await asyncio.sleep(1)
+    await hw_api.move_rel(mount, Point(0, 0, -1))
+    while time.time() < timeout_start + timeout:
+        try:
+            await hw_api.move_rel(mount, Point(0, 0, (-1 * int(distance))))
+            await hw_api.move_rel(mount, Point(0, 0, int(distance)))
+            # grab and print time and move count
+            count += 1
+            print(f"cycle: {count}")
+            runtime = time.time()-timeout_start
+            print(f"time: {runtime}")
+            # write count and runtime to csv sheet
+            run_data = [
+                [f"Cycle: {count}", f" Time: {runtime}"],
+            ]
+            with open(file_path, "a", newline="") as csvfile:
+                writer = csv.writer(csvfile)
+                writer.writerows(run_data)
+        except KeyboardInterrupt:
+            print("keyboardedly interupted")
+    
+    
+    
+    
     try:
         await hw_api.home()
         await asyncio.sleep(1)
@@ -109,9 +133,16 @@ async def _main(
                 writer = csv.writer(csvfile)
                 writer.writerows(run_data)
         await hw_api.home()
-    except KeyboardInterrupt:
-        await hw_api.disengage_axes([Axis.X, Axis.Y, Axis.Z, Axis.G])
+        errored = 0
+    # except KeyboardInterrupt:
+    #     print("it has run through keyboardinterrupt")
+    #     error_message = "because of a KeyboardInterrupt"
+    except Exception:
+        print("it has run through exception")
+        errored = 1
     finally:
+        #print(error_message)
+        print("THIS IS IN THE FINALLY THING")
         await hw_api.disengage_axes([Axis.X, Axis.Y, Axis.Z, Axis.G])
         await hw_api.clean_up()
 
