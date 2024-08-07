@@ -6,16 +6,25 @@ from .exceptions import RuntimeParameterRequired, ParameterValueError
 
 # TODO(jbl 2024-08-02) This is a public facing class and as such should be moved to the protocol_api folder
 class CSVParameter:
+    """
+    An object representing a CSV file to be used as a runtime parameter.
+
+    .. versionadded:: 2.20
+    """
+
     def __init__(self, csv_file: Optional[TextIO]) -> None:
         self._file = csv_file
         self._contents: Optional[str] = None
 
     @property
     def file(self) -> TextIO:
-        """Returns the file handler for the CSV file."""
+        """Returns the file handler for the CSV file.
+
+        The file is treated as read-only, UTF-8-encoded text.
+        """
         if self._file is None:
             raise RuntimeParameterRequired(
-                "CSV parameter needs to be set to a file for full analysis or run."
+                "CSV parameter needs to be set to a file for full analysis or protocol run."
             )
         return self._file
 
@@ -30,10 +39,21 @@ class CSVParameter:
     def parse_as_csv(
         self, detect_dialect: bool = True, **kwargs: Any
     ) -> List[List[str]]:
-        """Returns a list of rows with each row represented as a list of column elements.
+        """Parses the CSV data and returns a list of lists.
 
-        If there is a header for the CSV that will be the first row in the list (i.e. `.rows()[0]`).
-        All elements will be represented as strings, even if they are numeric in nature.
+        Each item in the parent list corresponds to a row in the CSV file.
+        If the CSV has a header, that will be the first row in the list: ``.parse_as_csv()[0]``.
+
+        Each item in the child lists corresponds to a single cell within its row.
+        The data for each cell is represented as a string, even if it is numeric in nature.
+        Cast these strings to integers or floating point numbers, as appropriate, to use
+        them as inputs to other API methods.
+
+        :param detect_dialect: If ``True``, examine the file and try to assign it a
+            :py:class:`csv.Dialect` to improve parsing behavior.
+        :param kwargs: For advanced CSV handling, you can pass any of the
+            `formatting parameters <https://docs.python.org/3/library/csv.html#csv-fmt-params>`_
+            accepted by :py:func:`csv.reader` from the Python standard library.
         """
         rows: List[List[str]] = []
         if detect_dialect:
