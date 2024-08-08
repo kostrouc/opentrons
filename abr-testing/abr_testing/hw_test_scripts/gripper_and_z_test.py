@@ -5,9 +5,14 @@ import asyncio
 import datetime
 import time
 import csv
-from opentrons_shared_data import errors
 import requests
 import os
+import json
+from requests.auth import HTTPBasicAuth
+from opentrons_shared_data.errors.exceptions import (
+    StallOrCollisionDetectedError,
+    PythonException,
+)
 
 from hardware_testing.opentrons_api.types import (
     OT3Mount,
@@ -23,21 +28,75 @@ async def _main(
     mount: OT3Mount, mount_name: str, simulate: bool, time_min: int, z_axis: Axis, distance: int
 ) -> None:
     
-    # check if folder exists, make folder if it doesn't
-    #BASE_DIRECTORY = "/users/NicholasShiland/Desktop/gripper_and_z_test/"
-    BASE_DIRECTORY = "/userfs/data/testing_data/gripper_and_z_test/"
+    #grab testing teams jira api info from a local file
+    # on robot: storage_directory = "/var/lib/jupyter/notebooks"
+    storage_directory = "/Users/NicholasShiland/Desktop"
+    jira_info = os.path.join(storage_directory, "testing_jira_info.json")
+    # create an dict copying the contents of the testing team jira info
+    try:
+        jira_keys = json.load(open(jira_info))
+        # grab token and email from the dict
+        tot_info = jira_keys["information"]
+        api_token = tot_info["api_token"]
+        email = tot_info["email"]
+    except FileNotFoundError:
+        print(
+            f"Please add json file with the testing teams jira API information to: {storage_directory}."
+        )
+
+    #make directory for tests. check if directory exists, make if doesn't.
+    BASE_DIRECTORY = "/users/NicholasShiland/Desktop/gripper_and_z_test/"
+    # ON ROBOT, BASE_DIRECTORY = "/userfs/data/testing_data/gripper_and_z_test/"
     if not os.path.exists(BASE_DIRECTORY):
         os.makedirs(BASE_DIRECTORY)
 
-    current_datetime = datetime.datetime.now()
+    #Ask, get, and test Jira ticket link
+    want_comment = False
+    while True:
+        y_or_no = input("Do you want to comment results to a JIRA Ticket? Y/N: ")
+        if y_or_no == "Y" or y_or_no == "y":
+            want_comment = True
+            while True:    
+                issue_key = input("Ticket Key: ")
+                url = f"https://opentrons.atlassian.net/rest/api/3/issue/{issue_key}/comment"
+                auth = HTTPBasicAuth(email, api_token)
 
-    #grab robot info and pipette info
-    ip = input("Robot IP: ")
-    # From health: robot name
-    response = requests.get(
-        f"http://{ip}:31950/health", headers={"opentrons-version": "3"}
-    )
-    print(response)
+                headers = {
+                "Accept": "application/json"
+                }
+                response = requests.request(
+                "GET",
+                url,
+                headers=headers,
+                auth=auth
+                )
+                if str(response) == "<Response [200]>":
+                    break
+                else:
+                    print("Please input a valid JIRA Key")
+            break
+        elif y_or_no == "N" or y_or_no == "n":
+            want_comment = False
+            break
+        else:
+            print("Please Choose a Valid Option")
+
+    #get and confirm robot IP address
+    while True:
+        ip = input("Robot IP: ")
+        # From health: robot name
+        try:
+            response = requests.get(
+                f"http://{ip}:31950/health", headers={"opentrons-version": "3"}
+            )
+            #confirm connection of IP
+            if str(response) == "<Response [200]>":
+                break
+            else:
+                print("Please input a valid IP address")
+        except BaseException:
+            print("Please input a valid IP address")
+
     health_data = response.json()
     robot_name = health_data.get("name", "")
     # from pipettes/instruments we get pipette/gripper serial
@@ -56,6 +115,8 @@ async def _main(
         )
         pipette_data = response.json()
         instrument_serial = pipette_data[mount_name].get("id", "")
+    if str(instrument_serial) == "None":
+        raise Exception("Please specify a valid mount.")
 
     print(instrument_serial)
     print(robot_name)
@@ -65,7 +126,7 @@ async def _main(
     time_start = current_datetime.strftime("%m-%d, at %H-%M-%S")
 
     init_data = [
-        [f"Robot: {robot_name}", f" Mount: {mount_name}", f" distance: dist", f" Instrument Serial: {instrument_serial}"],
+        [f"Robot: {robot_name}", f" Mount: {mount_name}", f" Distance: dist", f" Instrument Serial: {instrument_serial}"],
     ]
 
     file_path = f"{BASE_DIRECTORY}/{robot_name} test on {time_start}"
@@ -85,32 +146,8 @@ async def _main(
     timeout_start = time.time()
     timeout = time_min * 60
     count = 0
-    errored = 0
+    errored = False
     #finding home and starting to move
-    await hw_api.home()
-    await asyncio.sleep(1)
-    await hw_api.move_rel(mount, Point(0, 0, -1))
-    while time.time() < timeout_start + timeout:
-        try:
-            await hw_api.move_rel(mount, Point(0, 0, (-1 * int(distance))))
-            await hw_api.move_rel(mount, Point(0, 0, int(distance)))
-            # grab and print time and move count
-            count += 1
-            print(f"cycle: {count}")
-            runtime = time.time()-timeout_start
-            print(f"time: {runtime}")
-            # write count and runtime to csv sheet
-            run_data = [
-                [f"Cycle: {count}", f" Time: {runtime}"],
-            ]
-            with open(file_path, "a", newline="") as csvfile:
-                writer = csv.writer(csvfile)
-                writer.writerows(run_data)
-        except KeyboardInterrupt:
-            print("keyboardedly interupted")
-    
-    
-    
     
     try:
         await hw_api.home()
@@ -133,18 +170,68 @@ async def _main(
                 writer = csv.writer(csvfile)
                 writer.writerows(run_data)
         await hw_api.home()
-        errored = 0
-    # except KeyboardInterrupt:
-    #     print("it has run through keyboardinterrupt")
-    #     error_message = "because of a KeyboardInterrupt"
-    except Exception:
-        print("it has run through exception")
-        errored = 1
+    except StallOrCollisionDetectedError:
+        errored = True
+        print("Triggered STALL")
+        error_message = "Stall or Collision"
+    except PythonException:
+        errored = True
+        print("TRIGGERED KEYBOARDINTERUPT")
+        error_message = "KeyboardInterupt"
+    except BaseException as e:
+        errored = True
+        errorn = type(e).__name__
+        print(f"THIS ERROR WAS: {errorn}")
+        error_message = str(errorn)
     finally:
-        #print(error_message)
-        print("THIS IS IN THE FINALLY THING")
+        #Grab info and comment on JIRA
         await hw_api.disengage_axes([Axis.X, Axis.Y, Axis.Z, Axis.G])
         await hw_api.clean_up()
+        if want_comment == True:
+            with open(file_path, newline='') as csvfile:
+                csvobj = csv.reader(csvfile, delimiter=',')
+                
+                full_list = list(csvobj)
+                row_of_interest = full_list[count]
+                cropped_cycle = str(row_of_interest).split("'")[1]
+                cropped_time = str(row_of_interest).split("'")[3]
+                cropped_time = cropped_time[1:]
+            
+            if errored == True:
+                comment_message = f"This test failed due to {error_message} on {cropped_cycle} and {cropped_time}."
+            else:
+                comment_message = f"This test successfully completed at {cropped_cycle} and {cropped_time}."
+
+            #use REST to comment on JIRA ticket
+            headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json"
+            }
+            payload = json.dumps( {
+            "body": {
+                "content": [
+                {
+                    "content": [
+                    {
+                        "text": comment_message,
+                        "type": "text"
+                    }
+                    ],
+                    "type": "paragraph"
+                }
+                ],
+                "type": "doc",
+                "version": 1
+            },
+            } )
+            response = requests.request(
+            "POST",
+            url,
+            data=payload,
+            headers=headers,
+            auth=auth
+            )
+                
 
 
 def main() -> None:
