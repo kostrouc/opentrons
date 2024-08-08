@@ -257,7 +257,7 @@ class JiraTicket:
         components_list = response.json()
         return components_list
 
-    def comment(self, content_list: List[Dict[str, Any]], issue_info: str) -> None:
+    def comment(self, content_list: Any, issue_info: str) -> None:
         """Leave comment on JIRA Ticket."""
         comment_url = f"{self.url}/rest/api/3/issue/{issue_info}/comment"
         payload = json.dumps( {
@@ -266,8 +266,8 @@ class JiraTicket:
             {
                 "content": [
                 {
-                    "text": content_list,
-                    "type": "text"
+                    "any": content_list,
+                    "type": "any"
                 }
                 ],
                 "type": "paragraph"
