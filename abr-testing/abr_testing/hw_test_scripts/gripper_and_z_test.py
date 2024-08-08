@@ -27,22 +27,7 @@ from hardware_testing.opentrons_api.helpers_ot3 import (
 async def _main(
     mount: OT3Mount, mount_name: str, simulate: bool, time_min: int, z_axis: Axis, distance: int
 ) -> None:
-    """    
-    #grab testing teams jira api info from a local file
-    storage_directory = "/var/lib/jupyter/notebooks"
-    jira_info = os.path.join(storage_directory, "jira_credentials.json")
-    # create an dict copying the contents of the testing team jira info
-    try:
-        jira_keys = json.load(open(jira_info))
-        # grab token and email from the dict
-        tot_info = jira_keys["information"]
-        api_token = tot_info["api_token"]
-        email = tot_info["email"]
-    except FileNotFoundError:
-        print(
-            f"Please add json file with the testing teams jira API information to: {storage_directory}."
-        )
-    """
+    
     #make directory for tests. check if directory exists, make if doesn't.
     BASE_DIRECTORY = "/userfs/data/testing_data/gripper_and_z_test/"
     if not os.path.exists(BASE_DIRECTORY):
