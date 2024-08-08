@@ -25,18 +25,31 @@ from hardware_testing.opentrons_api.helpers_ot3 import (
 
 
 async def _main(
-    mount: OT3Mount, mount_name: str, simulate: bool, time_min: int, z_axis: Axis, distance: int
-) -> None:
+    mount: OT3Mount, mount_name: str, simulate: bool, time_min: int, z_axis: Axis) -> None:
     
     #make directory for tests. check if directory exists, make if doesn't.
     BASE_DIRECTORY = "/userfs/data/testing_data/gripper_and_z_test/"
     if not os.path.exists(BASE_DIRECTORY):
         os.makedirs(BASE_DIRECTORY)
 
+    #set limits then grab input distance.
+    limit = 150
+    if mount_name != "gripper":
+        limit = 210
+    while True:
+        try:
+            distance = float(input(f"How far would you like the z axis to travel? The range is between 1 and {str(limit)}: "))
+            if 0 < int(distance) <= limit:
+                break
+            else:
+                print(f"Please choose a value between 1 and {str(limit)}.")
+        except ValueError:
+            print(f"Please enter a number.")
+    
     #Ask, get, and test Jira ticket link
     want_comment = False
     while True:
-        y_or_no = input("Do you want to comment results to a JIRA Ticket? Y/N: ")
+        y_or_no = input("Do you want to attach the results to a JIRA Ticket? Y/N: ")
         if y_or_no == "Y" or y_or_no == "y":
             #grab testing teams jira api info from a local file
             storage_directory = "/var/lib/jupyter/notebooks"
@@ -55,7 +68,7 @@ async def _main(
             want_comment = True
             while True:    
                 issue_key = input("Ticket Key: ")
-                url = f"https://opentrons.atlassian.net/rest/api/3/issue/{issue_key}/comment"
+                url = f"https://opentrons.atlassian.net/rest/api/3/issue/{issue_key}"
                 auth = HTTPBasicAuth(email, api_token)
 
                 headers = {
@@ -123,7 +136,7 @@ async def _main(
     time_start = current_datetime.strftime("%m-%d, at %H-%M-%S")
 
     init_data = [
-        [f"Robot: {robot_name}", f" Mount: {mount_name}", f" Distance: dist", f" Instrument Serial: {instrument_serial}"],
+        [f"Robot: {robot_name}", f" Mount: {mount_name}", f" Distance: {distance}", f" Instrument Serial: {instrument_serial}"],
     ]
 
     file_path = f"{BASE_DIRECTORY}/{robot_name} test on {time_start}"
@@ -169,11 +182,9 @@ async def _main(
         await hw_api.home()
     except StallOrCollisionDetectedError:
         errored = True
-        print("Triggered STALL")
         error_message = "Stall or Collision"
     except PythonException:
         errored = True
-        print("TRIGGERED KEYBOARDINTERUPT")
         error_message = "KeyboardInterupt"
     except BaseException as e:
         errored = True
@@ -200,6 +211,7 @@ async def _main(
                 comment_message = f"This test successfully completed at {cropped_cycle} and {cropped_time}."
 
             #use REST to comment on JIRA ticket
+            comment_url = url + "/comment"
             headers = {
             "Accept": "application/json",
             "Content-Type": "application/json"
@@ -223,10 +235,26 @@ async def _main(
             } )
             response = requests.request(
             "POST",
-            url,
+            comment_url,
             data=payload,
             headers=headers,
             auth=auth
+            )
+            #post csv file created to jira ticket
+            attachment_url = url + "/attachments"
+            headers = {
+                "Accept": "application/json",
+                "X-Atlassian-Token": "no-check"
+            }
+
+            response = requests.request(
+            "POST",
+            attachment_url,
+            headers=headers,
+            auth=auth,
+            files = {
+                "file": (file_path, open(file_path,"rb"), "application-type")
+            }
             )
                 
 
@@ -245,19 +273,16 @@ def main() -> None:
         mount = OT3Mount.LEFT
         mount_name = "left"
         z_axis = Axis.Z_L
-        distance = 115
     elif args.mount == "gripper":
         mount = OT3Mount.GRIPPER
         mount_name = "gripper"
         z_axis = Axis.Z_G
-        distance = 190
     else:
         mount = OT3Mount.RIGHT
         mount_name = "right"
         z_axis = Axis.Z_R
-        distance = 115
     print(f"Mount Testing: {mount}")
-    asyncio.run(_main(mount, mount_name, args.simulate, args.time_min, z_axis, distance))
+    asyncio.run(_main(mount, mount_name, args.simulate, args.time_min, z_axis))
 
 
 if __name__ == "__main__":
