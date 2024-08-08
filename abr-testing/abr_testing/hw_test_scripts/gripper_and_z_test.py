@@ -27,11 +27,10 @@ from hardware_testing.opentrons_api.helpers_ot3 import (
 async def _main(
     mount: OT3Mount, mount_name: str, simulate: bool, time_min: int, z_axis: Axis, distance: int
 ) -> None:
-    
+    """    
     #grab testing teams jira api info from a local file
-    # on robot: storage_directory = "/var/lib/jupyter/notebooks"
-    storage_directory = "/Users/NicholasShiland/Desktop"
-    jira_info = os.path.join(storage_directory, "testing_jira_info.json")
+    storage_directory = "/var/lib/jupyter/notebooks"
+    jira_info = os.path.join(storage_directory, "jira_credentials.json")
     # create an dict copying the contents of the testing team jira info
     try:
         jira_keys = json.load(open(jira_info))
@@ -43,10 +42,9 @@ async def _main(
         print(
             f"Please add json file with the testing teams jira API information to: {storage_directory}."
         )
-
+    """
     #make directory for tests. check if directory exists, make if doesn't.
-    BASE_DIRECTORY = "/users/NicholasShiland/Desktop/gripper_and_z_test/"
-    # ON ROBOT, BASE_DIRECTORY = "/userfs/data/testing_data/gripper_and_z_test/"
+    BASE_DIRECTORY = "/userfs/data/testing_data/gripper_and_z_test/"
     if not os.path.exists(BASE_DIRECTORY):
         os.makedirs(BASE_DIRECTORY)
 
@@ -55,6 +53,20 @@ async def _main(
     while True:
         y_or_no = input("Do you want to comment results to a JIRA Ticket? Y/N: ")
         if y_or_no == "Y" or y_or_no == "y":
+            #grab testing teams jira api info from a local file
+            storage_directory = "/var/lib/jupyter/notebooks"
+            jira_info = os.path.join(storage_directory, "jira_credentials.json")
+            # create an dict copying the contents of the testing team jira info
+            try:
+                jira_keys = json.load(open(jira_info))
+                # grab token and email from the dict
+                tot_info = jira_keys["information"]
+                api_token = tot_info["api_token"]
+                email = tot_info["email"]
+            except FileNotFoundError:
+                raise Exception(
+                    f"Please add json file with the testing team jira credentials to: {storage_directory}."
+                )
             want_comment = True
             while True:    
                 issue_key = input("Ticket Key: ")
