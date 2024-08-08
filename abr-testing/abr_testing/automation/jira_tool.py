@@ -262,19 +262,9 @@ class JiraTicket:
         comment_url = f"{self.url}/rest/api/3/issue/{issue_info}/comment"
         payload = json.dumps( {
         "body": {
-            "content": [
-            {
-                "content": [
-                {
-                    "doc": content_list,
-                    "type": "doc"
-                }
-                ],
-                "type": "paragraph"
-            }
-            ],
             "type": "doc",
-            "version": 1
+            "version": 1,
+            "content": content_list,
         },
         } )
         requests.request(
