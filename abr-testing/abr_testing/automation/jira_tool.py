@@ -266,8 +266,8 @@ class JiraTicket:
             {
                 "content": [
                 {
-                    "any": content_list,
-                    "type": "any"
+                    "doc": content_list,
+                    "type": "doc"
                 }
                 ],
                 "type": "paragraph"
