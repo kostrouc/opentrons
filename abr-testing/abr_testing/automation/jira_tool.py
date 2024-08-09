@@ -271,7 +271,16 @@ class JiraTicket:
         requests.request(
             "POST", comment_url, data=payload, headers=self.headers, auth=self.auth
         )
-
+    
+    def format_jira_comment(self, comment_info: Any) -> List[Dict[str, Any]]:
+        """Format regular variables to work using the comment function."""
+        content_list = []
+        line_1 = {
+            "type": "paragraph",
+            "content": [{"type": "text", "text": comment_info}],
+        }
+        content_list.insert(0, line_1)
+        return content_list
 
 if __name__ == "__main__":
     """Create ticket for specified robot."""

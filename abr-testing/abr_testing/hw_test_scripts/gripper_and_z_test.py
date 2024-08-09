@@ -9,6 +9,8 @@ import requests
 import os
 import json
 from requests.auth import HTTPBasicAuth
+from typing import List, Tuple, Any, Dict, Optional
+from abr_testing.automation import jira_tool
 from opentrons_shared_data.errors.exceptions import (
     StallOrCollisionDetectedError,
     PythonException,
@@ -21,7 +23,6 @@ from hardware_testing.opentrons_api.types import (
 from hardware_testing.opentrons_api.helpers_ot3 import (
     build_async_ot3_hardware_api,
 )
-
 
 async def _main(
     mount: OT3Mount, mount_name: str, simulate: bool, time_min: int, z_axis: Axis
@@ -81,6 +82,7 @@ async def _main(
                     break
                 else:
                     print("Please input a valid JIRA Key")
+            ticket = jira_tool.JiraTicket(url, api_token, email)
             break
         elif y_or_no == "N" or y_or_no == "n":
             want_comment = False
@@ -147,8 +149,6 @@ async def _main(
         writer = csv.writer(creating_new_csv_file)
         writer.writerows(init_data)
 
-    input("press enter to continue")
-
     # hw api setup
     hw_api = await build_async_ot3_hardware_api(
         is_simulating=simulate, use_defaults=True
@@ -213,25 +213,9 @@ async def _main(
                 comment_message = f"This test successfully completed at {cropped_cycle} and {cropped_time}."
 
             # use REST to comment on JIRA ticket
-            comment_url = url + "/comment"
-            headers = {"Accept": "application/json", "Content-Type": "application/json"}
-            payload = json.dumps(
-                {
-                    "body": {
-                        "content": [
-                            {
-                                "content": [{"text": comment_message, "type": "text"}],
-                                "type": "paragraph",
-                            }
-                        ],
-                        "type": "doc",
-                        "version": 1,
-                    },
-                }
-            )
-            response = requests.request(
-                "POST", comment_url, data=payload, headers=headers, auth=auth
-            )
+            comment_item = ticket.format_jira_comment(comment_message)
+            ticket.comment(comment_item, url)
+
             # post csv file created to jira ticket
             attachment_url = url + "/attachments"
             headers = {"Accept": "application/json", "X-Atlassian-Token": "no-check"}
