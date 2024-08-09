@@ -200,7 +200,6 @@ def read_each_log(folder_path: str, issue_url: str) -> None:
                         "content": [{"type": "text", "text": message}],
                     }
                     content_list.insert(0, line_1)
-                    print(issue_key)
                     ticket.comment(content_list, issue_key)
             no_word_found_message = (
                 f"Key words '{not_found_words} were not found in {file_name}."
