@@ -9,7 +9,6 @@ import requests
 import os
 import json
 from requests.auth import HTTPBasicAuth
-from typing import List, Tuple, Any, Dict, Optional
 from abr_testing.automation import jira_tool
 from opentrons_shared_data.errors.exceptions import (
     StallOrCollisionDetectedError,
@@ -27,6 +26,7 @@ from hardware_testing.opentrons_api.helpers_ot3 import (
 async def _main(
     mount: OT3Mount, mount_name: str, simulate: bool, time_min: int, z_axis: Axis
 ) -> None:
+    
     domain_url = "https://opentrons.atlassian.net"
 
     # make directory for tests. check if directory exists, make if doesn't.
