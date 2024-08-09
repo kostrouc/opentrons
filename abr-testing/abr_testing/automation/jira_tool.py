@@ -171,11 +171,18 @@ class JiraTicket:
     def post_attachment_to_ticket(self, issue_id: str, attachment_path: str) -> None:
         """Adds attachments to ticket."""
         # TODO: Ensure that file is actually uploaded.
-        file = {"file": open(attachment_path, "rb")}
-        JSON_headers = {"Accept": "application/json"}
+        file = {
+            "file": (attachment_path, open(attachment_path,"rb"), "application-type")
+        }
+        JSON_headers = {
+            "Accept": "application/json",
+            "X-Atlassian-Token": "no-check"
+        }
+        attachment_url = f"{self.url}/rest/api/3/issue/{issue_id}/attachments"
         try:
-            response = requests.post(
-                f"{self.url}/rest/api/3/issue/{issue_id}/attachments",
+            response = requests.request(
+                "POST",
+                attachment_url,
                 headers=JSON_headers,
                 auth=self.auth,
                 files=file,
@@ -273,7 +280,7 @@ class JiraTicket:
         )
     
     def format_jira_comment(self, comment_info: Any) -> List[Dict[str, Any]]:
-        """Format regular variables to work using the comment function."""
+        """Formats a string input to work with the "comment" function."""
         content_list = []
         line_1 = {
             "type": "paragraph",

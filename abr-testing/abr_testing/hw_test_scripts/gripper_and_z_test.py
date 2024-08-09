@@ -27,6 +27,7 @@ from hardware_testing.opentrons_api.helpers_ot3 import (
 async def _main(
     mount: OT3Mount, mount_name: str, simulate: bool, time_min: int, z_axis: Axis
 ) -> None:
+    domain_url = "https://opentrons.atlassian.net"
 
     # make directory for tests. check if directory exists, make if doesn't.
     BASE_DIRECTORY = "/userfs/data/testing_data/gripper_and_z_test/"
@@ -82,7 +83,7 @@ async def _main(
                     break
                 else:
                     print("Please input a valid JIRA Key")
-            ticket = jira_tool.JiraTicket(url, api_token, email)
+            ticket = jira_tool.JiraTicket(domain_url, api_token, email)
             break
         elif y_or_no == "N" or y_or_no == "n":
             want_comment = False
@@ -213,20 +214,11 @@ async def _main(
                 comment_message = f"This test successfully completed at {cropped_cycle} and {cropped_time}."
 
             # use REST to comment on JIRA ticket
-            comment_item = ticket.format_jira_comment(comment_message)
-            ticket.comment(comment_item, url)
+            comment_message = ticket.format_jira_comment(comment_message)
+            ticket.comment(comment_message, url)
 
             # post csv file created to jira ticket
-            attachment_url = url + "/attachments"
-            headers = {"Accept": "application/json", "X-Atlassian-Token": "no-check"}
-
-            response = requests.request(
-                "POST",
-                attachment_url,
-                headers=headers,
-                auth=auth,
-                files={"file": (file_path, open(file_path, "rb"), "application-type")},
-            )
+            ticket.post_attachment_to_ticket(issue_key, file_path)
 
 
 def main() -> None:
